@@ -6,7 +6,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 
-
 public class OspfUIController {
     @FXML private Label lblDispRID;
     @FXML private TextField txtRID;

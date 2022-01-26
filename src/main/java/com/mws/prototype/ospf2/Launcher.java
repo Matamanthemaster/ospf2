@@ -1,8 +1,10 @@
 package com.mws.prototype.ospf2;
 
+import com.mws.prototype.ospf2.storage.Config;
+
 public class Launcher {
 
-    private static String commandUsage =
+    private final static String commandUsage =
             "Usage: java -jar ospf2.jar [arguments]" + System.lineSeparator() +
                     "Arguments:" + System.lineSeparator() +
                     "   --help:                     Prints this help message"+ System.lineSeparator() +
@@ -12,9 +14,7 @@ public class Launcher {
     private static Config config;
 
     public static void main(String[] args) {
-        uiThread = new Thread(() -> {
-            OspfUIMain.main(args);
-        });
+        uiThread = new Thread(() -> OspfUIMain.main(args));
 
         if (args.length > 0) {
             SearchFlags(args);
@@ -31,7 +31,7 @@ public class Launcher {
     private static void SearchFlags(String[] args)
     {
         //flag to determine if this argument should be skipped when searching for a flag.
-        Boolean flagSkipFlag = false;
+        boolean flagSkipFlag = false;
 
         //for (args: arg)
         for (int i = 0; i < args.length; i++) {
