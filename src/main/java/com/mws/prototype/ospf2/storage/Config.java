@@ -8,37 +8,40 @@ import java.net.Inet4Address;
 */
 public class Config {
 
-    File fileConfig; //File reference, for IO Operations
-    Node thisNode;
+    protected static File fileConfig; //File reference, for IO Operations
+    protected static ThisNode thisNode;
+    protected static NeighboursTable neighboursTable;
+    protected static LSDB lsdb;
+    protected static int inactiveTimerDelay;
 
 
     /**
-     * Constructor for the OSPF config, that uses the default config file path.
-     * Constructor creates a file if it doesn't already exist.
-     * Constructor also populates local variables with values from the config.
+     * Set method for the OSPF config, that uses the default config file path.
+     * Creates a file if it doesn't already exist.
+     * Also populates local variables with values from the config.
      * Default path: ./ospf.conf
      */
-    public Config() {
-        CommonConstructor(System.getProperty("user.dir") + "ospf.conf");
+    protected static void SetConfig() {
+        CommonMain(System.getProperty("user.dir") + "ospf.conf");
     }
 
     /**
-     * Constructor for OSPF config that takes a specific config file path.
-     * Constructor creates a file if it doesn't already exist.
-     * Constructor also populates local variables with values from the config.
+     * Set method for OSPF config that takes a specific config file path.
+     * Creates a config file if it doesn't already exist.
+     * Also populates local variables with values from the config.
      *
      * @param path config file path
      */
-    public Config(String path) {
-        CommonConstructor(path);
+    protected static void SetConfig(String path) {
+        CommonMain(path);
     }
 
     /**
-     * Constructor method that performs the common constructor jobs, instead of copying code between constructor methods.
+     * Main start method that performs the common jobs, instead of copying code between set methods.
      *
      * @param path Config file path
      */
-    private void CommonConstructor(String path) {
+    private static void CommonMain(String path) {
         fileConfig = new File(path);
         System.out.println(fileConfig.getPath());
         if (!fileConfig.exists()) {
@@ -51,16 +54,16 @@ public class Config {
     /**
      * Create an ospf.conf file at the desired location, with sensible default values.
      */
-    private void MakeConfig() {
+    private static void MakeConfig() {
         //thisNode = new Node();
         WriteConfig();
     }
 
-    public void ReadConfig() {
+    protected static void ReadConfig() {
 
     }
 
-    public void WriteConfig() {
+    protected static void WriteConfig() {
 
     }
 }
