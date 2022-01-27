@@ -16,11 +16,18 @@ public class Launcher {
     public static void main(String[] args) {
         uiThread = new Thread(() -> OspfUIMain.main(args));
 
+        //Check args if they exist
         if (args.length > 0) {
             SearchFlags(args);
         }
 
-        //Entry point for CLI server application.
+        //Setup config if it wasn't made from args.
+        if (!Config.ConfigExists())
+        {
+            Config.SetConfig();
+        }
+
+        //Entry point for CLI daemon.
         System.out.println("CLI Program Run");
     }
 
@@ -50,7 +57,7 @@ public class Launcher {
                 case "-g", "--with-gui" -> uiThread.start();//Argument to launch GUI
                 case "-c", "--config-file" -> {//Argument to specify a config file path
                     flagSkipFlag = true;
-                    ConfigFile(args[i+1]);
+                    Config.SetConfig(args[i+1]);
                 }
                 default -> { //Arg not found. Invalid use of program.
                     System.out.println("Argument not recognised: '" + arg + "'.");
@@ -59,13 +66,5 @@ public class Launcher {
                 }
             }
         }
-    }
-
-    /**
-     * Use a specific config file
-     */
-    private static void ConfigFile(String path)
-    {
-
     }
 }
