@@ -1,6 +1,9 @@
 package com.mws.prototype.ospf2.storage;
 
+import inet.ipaddr.*;
 import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import java.io.*;
@@ -10,6 +13,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import inet.ipaddr.IPAddressNetwork;
 /**
 * Class to store the OSPF config file reference, and values in java data types.
 */
@@ -21,7 +25,6 @@ public class Config {
     public static NeighboursTable neighboursTable;
     public static LSDB lsdb;
     public static int inactiveTimerDelay;
-
 
     /**
      * Set method for the OSPF config, that uses the default config file path.
@@ -55,7 +58,7 @@ public class Config {
         if (!fileConfig.exists()) {
             try {
                 MakeConfig();
-            } catch (SocketException | UnknownHostException e) {
+            } catch (SocketException | UnknownHostException | AddressStringException e) {
                 e.printStackTrace();
                 System.exit(-1);
             }
@@ -67,7 +70,7 @@ public class Config {
     /**
      * Create an ospf.conf file at the desired location, with sensible default values.
      */
-    private static void MakeConfig() throws SocketException, UnknownHostException {
+    private static void MakeConfig() throws SocketException, UnknownHostException, AddressStringException {
         hostname = "Router";
         List<RouterInterface> routerInterfaces = new ArrayList<>(Collections.emptyList());
 
@@ -75,18 +78,18 @@ public class Config {
         Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
         for (NetworkInterface networkInterface: Collections.list(interfaces)) {
             //IP addresses
-            InterfaceAddress ipv4Addr = null;
-            List<InterfaceAddress> ipv6Addrs = new ArrayList<>();
+            IPAddress ipv4Addr = null;
+            List<IPAddress> ipv6Addrs = new ArrayList<>();
 
             //loop over all addresses, if the address is ipv4, add it to the Ipv4 local variable, if ipv6, add to the list of IPv6 addresses.
             for (InterfaceAddress inetAddress : networkInterface.getInterfaceAddresses()) {
                 if (inetAddress.getAddress() instanceof Inet4Address)
                 {
-                    ipv4Addr = inetAddress;
+                    ipv4Addr = new IPAddressNetwork.IPAddressGenerator().from(inetAddress.getAddress());
                 }
                 else if (inetAddress.getAddress() instanceof Inet6Address)
                 {
-                    ipv6Addrs.add(inetAddress);
+                    ipv6Addrs.add(new IPAddressNetwork.IPAddressGenerator().from(inetAddress.getAddress()));
                 }
             }
 
@@ -100,7 +103,7 @@ public class Config {
             ));
         }
 
-        thisNode = new ThisNode((Inet4Address) InetAddress.getByName("1.1.1.1"), routerInterfaces);
+        thisNode = new ThisNode(new IPAddressString("1.1.1.1").toAddress(), routerInterfaces);
 
         WriteConfig();
     }
@@ -112,9 +115,36 @@ public class Config {
             StringBuilder xmlStringBuilder = new StringBuilder();
             Document configDocument = builder.parse(fileConfig);
 
+            //get global config information, hostname, rid.
             hostname = configDocument.getElementsByTagName("Hostname").item(0).getTextContent();
+            IPAddress rid = new IPAddressString(configDocument.getElementsByTagName("RID").item(0).getTextContent()).toAddress();
 
-        } catch (ParserConfigurationException | SAXException | IOException e) {
+            //Go into the interfaces' element, loop over each child, getting all children of each interface and storing them in a RouterInterface object.
+            List<RouterInterface> confInterfaces = new ArrayList<>();
+            NodeList confIntRoot = configDocument.getElementsByTagName("Interfaces");
+            for (int i = 0; i < confIntRoot.getLength(); i++)
+            {
+                Node curInt = confIntRoot.item(i);
+
+                String curIntName = curInt.getNodeName();
+
+                NodeList curIntVars  = curInt.getChildNodes();
+                // ipv4 = new InterfaceAddress();
+
+                for (int v = 0; v < curIntVars.getLength(); v++)
+                {
+                    switch (curIntVars.item(v).getNodeName())
+                    {
+                        //case "IPv4": -> ;
+                    }
+                }
+                //RouterInterface curConfInt = new RouterInterface(curIntName, )
+            }
+            
+            
+            thisNode = new ThisNode(rid, confInterfaces);
+
+        } catch (ParserConfigurationException | SAXException | IOException | AddressStringException e) {
             e.printStackTrace();
             System.exit(-1);
         }

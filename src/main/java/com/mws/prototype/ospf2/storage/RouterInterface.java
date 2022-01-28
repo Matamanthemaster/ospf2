@@ -1,5 +1,6 @@
 package com.mws.prototype.ospf2.storage;
 
+import inet.ipaddr.IPAddress;
 import org.jetbrains.annotations.NotNull;
 
 import java.net.InterfaceAddress;
@@ -15,8 +16,8 @@ public class RouterInterface {
     }
 
     private final String name;
-    public InterfaceAddress addrIPv4;
-    public List<InterfaceAddress> addrIPv6;//List of addresses assigned to a router interface.
+    public IPAddress addrIPv4;
+    public List<IPAddress> addrIPv6;//List of addresses assigned to a router interface.
     public InterfaceType type; //Interface type identifier. Used by code to determine what type of interface it is. Uses enum
     public Boolean isEnabled; //Interface on?
     public Boolean isPassive; //Does the interface send routing updates?
@@ -31,7 +32,7 @@ public class RouterInterface {
      * @param enabled interface status, is it up
      * @throws IllegalArgumentException name contains invalid characters or is null
      */
-    public RouterInterface(@NotNull String name, InterfaceAddress ipv4, List<InterfaceAddress> ipv6, InterfaceType type, Boolean enabled) {
+    public RouterInterface(@NotNull String name, IPAddress ipv4, List<IPAddress> ipv6, InterfaceType type, Boolean enabled) {
         if (name.contains(" ") || name.equals(null)) {
             throw new IllegalArgumentException();
         }

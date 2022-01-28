@@ -1,6 +1,7 @@
 package com.mws.prototype.ospf2.storage;
 
-import java.net.Inet4Address;
+import inet.ipaddr.IPAddress;
+
 import java.net.InterfaceAddress;
 import java.util.List;
 import java.util.Timer;
@@ -15,7 +16,7 @@ public class NeighbourNode extends Node {
     public int ddSeqNum;
     public LastReceivedDD lastDD;
     public int priority;
-    public InterfaceAddress ipAddress;
+    public IPAddress ipAddress;
     public List<HelloOptions> helloOptions;
 
     //variable for reset task, identical for each instance of object, but with the correct reference to the instance of TimerExpire() method.
@@ -35,7 +36,7 @@ public class NeighbourNode extends Node {
      * @param ipAddress the neighbour's interface IP address, for unicast messaging
      * @param helloOptions the neighbour's advertised options
      */
-    public NeighbourNode(Inet4Address rID, int priority, InterfaceAddress ipAddress, List<HelloOptions> helloOptions) {
+    public NeighbourNode(IPAddress rID, int priority, IPAddress ipAddress, List<HelloOptions> helloOptions) {
         super(rID);
         this.priority = priority;
         this.ipAddress = ipAddress;

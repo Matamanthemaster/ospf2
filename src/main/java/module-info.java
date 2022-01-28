@@ -5,6 +5,7 @@ module com.mws.prototype.ospf2 {
     requires org.kordamp.bootstrapfx.core;
     requires org.jetbrains.annotations;
     requires java.xml;
+    requires inet.ipaddr;
 
     exports com.mws.prototype.ospf2;
     opens com.mws.prototype.ospf2 to javafx.fxml, javafx.graphics;
