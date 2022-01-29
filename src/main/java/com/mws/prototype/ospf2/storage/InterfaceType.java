@@ -66,4 +66,72 @@ public enum InterfaceType {
     {
         return this.bandwidth;
     }
+
+    /**
+     * Convert enum type to string, based on the specific enum. Useful for storage in a file.
+     * @return a text string that represents the string value.
+     */
+   public String toString()
+   {
+       switch (this)
+       {
+           case T1 -> {
+               return "T1";
+           }
+           case E1 -> {
+               return "E1";
+           }
+           case E10BASET -> {
+                return "10Base-T";
+           }
+           case E100BASET -> {
+               return  "100Base-T";
+           }
+           case E1000BASET -> {
+               return "1000Base-T";
+           }
+           case E2_5GBASET -> {
+               return "2.5GBase-T";
+           }
+           case E5GBASET -> {
+               return "5GBase-T";
+           }
+           case E10GBASET -> {
+               return "10GBase-T";
+           }
+           default -> throw new IllegalStateException("Unexpected value: " + this);
+       }
+   }
+
+    public static InterfaceType fromString(String type)
+    {
+        switch (type)
+        {
+            case "T1" -> {
+                return InterfaceType.T1;
+            }
+            case "E1" -> {
+                return InterfaceType.E1;
+            }
+            case "10Base-T" -> {
+                return InterfaceType.E10BASET;
+            }
+            case "100Base-T" -> {
+                return InterfaceType.E100BASET;
+            }
+            case "1000Base-T" -> {
+                return InterfaceType.E1000BASET;
+            }
+            case "2.5GBase-T" -> {
+                return  InterfaceType.E2_5GBASET;
+            }
+            case "5GBase-T" -> {
+                return InterfaceType.E5GBASET;
+            }
+            case "10GBase-T" -> {
+                return InterfaceType.E10GBASET;
+            }
+            default -> throw new IllegalStateException("Unexpected value: " + type);
+        }
+    }
 }

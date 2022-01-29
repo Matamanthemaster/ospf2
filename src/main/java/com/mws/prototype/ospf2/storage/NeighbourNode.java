@@ -2,7 +2,6 @@ package com.mws.prototype.ospf2.storage;
 
 import inet.ipaddr.IPAddress;
 
-import java.net.InterfaceAddress;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -59,7 +58,7 @@ public class NeighbourNode extends Node {
      */
     private void ResetInactiveTimer() {
         timerInactivity.cancel();
-        timerInactivity.schedule(resetTask, Config.inactiveTimerDelay);
+        timerInactivity.schedule(resetTask, Config.deadInterval);
     }
 
     /**

@@ -5,13 +5,16 @@ import com.mws.prototype.ospf2.storage.Config;
 public class Launcher {
 
     private final static String commandUsage =
-            "Usage: java -jar ospf2.jar [arguments]" + System.lineSeparator() +
+            "Usage: java -jar ospf2.jar [arguments] <Operation Mode Flag>" + System.lineSeparator() +
                     "Arguments:" + System.lineSeparator() +
                     "   --help:                     Prints this help message"+ System.lineSeparator() +
                     "   -g, --with-gui:             Runs the program with the GUI frontend" + System.lineSeparator() +
-                    "   -c, --config-file <Path>    Specify an alternate config file (Default ./ospf.cfg)" + System.lineSeparator();
+                    "   -c, --config-file <Path>    Specify an alternate config file (Default ./ospf.cfg)" + System.lineSeparator() +
+                    "Operation Mode Flags:" + System.lineSeparator() +
+                    "   --Standard-OSPF" + System.lineSeparator() +
+                    "   --Encrypted-OSPF" + System.lineSeparator();
     private static Thread uiThread;
-    private static Config config;
+    private static String operationMode;
 
     public static void main(String[] args) {
         uiThread = new Thread(() -> OspfUIMain.main(args));
@@ -50,6 +53,24 @@ public class Launcher {
             String arg = args[i];
 
             switch (arg) {
+                case "--Standard-OSPF" -> {
+                    if (!operationMode.equals(""))
+                    {
+                        System.err.println("Cannot use multiple operation modes.");
+                        System.out.println(commandUsage);
+                        System.exit(-1);
+                    }
+                    operationMode = "standard";
+                }
+                case "--Encrypted-OSPF" -> {
+                    if (!operationMode.equals(""))
+                    {
+                        System.err.println("Cannot use multiple operation modes.");
+                        System.out.println(commandUsage);
+                        System.exit(-1);
+                    }
+                    operationMode = "encrypted";
+                }
                 case "--help", "-help" -> { //Request to see command usage
                     System.out.println(commandUsage);
                     System.exit(0);
