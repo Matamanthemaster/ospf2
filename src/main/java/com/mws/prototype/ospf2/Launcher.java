@@ -9,7 +9,7 @@ public class Launcher {
                     "Arguments:" + System.lineSeparator() +
                     "   --help:                     Prints this help message"+ System.lineSeparator() +
                     "   -g, --with-gui:             Runs the program with the GUI frontend" + System.lineSeparator() +
-                    "   -c, --config-file <Path>    Specify an alternate config file (Default ./ospf.cfg)" + System.lineSeparator() +
+                    "   -c, --config-file <Path>    Specify an alternate config file (Default ./ospf.conf.xml)" + System.lineSeparator() +
                     "Operation Mode Flags:" + System.lineSeparator() +
                     "   --Standard-OSPF" + System.lineSeparator() +
                     "   --Encrypted-OSPF" + System.lineSeparator();
@@ -80,6 +80,7 @@ public class Launcher {
                     flagSkipFlag = true;
                     Config.SetConfig(args[i+1]);
                 }
+                case "--remove-config" -> Config.flagFileConfRemove = true;//Argument useful for testing, will remove the config file.
                 default -> { //Arg not found. Invalid use of program.
                     System.out.println("Argument not recognised: '" + arg + "'.");
                     System.out.println(commandUsage);

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<config>
+    <Hostname>Router</Hostname>
+    <RID>1.1.1.1</RID>
+    <HelloInterval>10</HelloInterval>
+    <DeadInterval>40</DeadInterval>
+    <interfaces>
+        <enp5s0>
+            <IPv4>192.168.1.87/24</IPv4>
+            <IPv6>fd41:ec90:a19f::e735:7292:110c:990f%enp5s0/64</IPv6>
+            <IPv6>fe80::2211:38af:6b56:bc83%enp5s0/64</IPv6>
+            <IPv6>2a02:c7e:b4c:fa00:32:9ca7:1a3e:6919%enp5s0/64</IPv6>
+            <Type>E1</Type>
+            <Enabled>true</Enabled>
+        </enp5s0>
+        <lo>
+            <IPv4>127.0.0.1/8</IPv4>
+            <IPv6>::1%lo/128</IPv6>
+            <Type>E1</Type>
+            <Enabled>true</Enabled>
+        </lo>
+    </interfaces>
+</config>

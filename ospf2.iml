@@ -27,7 +27,7 @@
     <orderEntry type="library" scope="TEST" name="Maven: org.junit.platform:junit-platform-engine:1.8.2" level="project" />
     <orderEntry type="library" name="Maven: org.jetbrains:annotations:22.0.0" level="project" />
     <orderEntry type="library" name="Maven: xml-apis:xml-apis:1.0.b2" level="project" />
-    <orderEntry type="library" exported="" name="Maven: com.github.seancfoley:ipaddress:5.3.3" level="project" />
+    <orderEntry type="library" name="Maven: com.github.seancfoley:ipaddress:5.3.3" level="project" />
     <orderEntry type="library" name="Maven: org.webjars.npm:email-addresses:3.1.0" level="project" />
   </component>
 </module>

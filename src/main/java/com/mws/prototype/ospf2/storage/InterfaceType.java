@@ -71,6 +71,7 @@ public enum InterfaceType {
      * Convert enum type to string, based on the specific enum. Useful for storage in a file.
      * @return a text string that represents the string value.
      */
+    @Override
    public String toString()
    {
        switch (this)
