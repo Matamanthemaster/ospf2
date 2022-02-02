@@ -1,7 +1,5 @@
 package com.mws.ospf2;
 
-import com.mws.ospf2.ui.Main;
-
 public class Launcher {
 
     private final static String commandUsage =
@@ -14,32 +12,42 @@ public class Launcher {
                     "   --Standard-OSPF" + System.lineSeparator() +
                     "   --Encrypted-OSPF" + System.lineSeparator();
     private static Thread uiThread;
+    private static Thread daemonThread;
     private static String operationMode;
 
     public static void main(String[] args) {
-        uiThread = new Thread(() -> Main.main(args));
+        uiThread = new Thread(() -> com.mws.ospf2.ui.Main.main(args));
 
         //Check args if they exist
-        if (args.length > 0) {
+        if (args.length > 0)
             SearchFlags(args);
-        }
 
         //Setup config if it wasn't made from args.
         if (!Config.ConfigExists())
-        {
             Config.SetConfig();
-        }
 
         //Entry point for CLI daemon.
-        System.out.println("CLI Program Run");
+        if (operationMode == null)
+            LauncherErrorHandle("Operation mode not specified.");
+
+        //Check operation mode from flags.
+        if (operationMode.equals("standard"))
+            daemonThread = new Thread(com.mws.ospf2.daemon.std.Main::main);
+        else if (operationMode.equals("encrypted"))
+            daemonThread = new Thread(com.mws.ospf2.daemon.enc.Main::main);
+
+        if (daemonThread == null)
+            LauncherErrorHandle("Could not create a daemon thread. Launcher.operationMode is null.");
+
+        System.out.println("Daemon Program Run");
+        daemonThread.start();
     }
 
     /**
      * Method looks through each argument provided to the program, and runs actions on hitting specific flags.
      * @param  args the program args to search through
      */
-    private static void SearchFlags(String[] args)
-    {
+    private static void SearchFlags(String[] args) {
         //flag to determine if this argument should be skipped when searching for a flag.
         boolean flagSkipFlag = false;
 
@@ -54,21 +62,15 @@ public class Launcher {
 
             switch (arg) {
                 case "--Standard-OSPF" -> {
-                    if (!operationMode.equals(""))
-                    {
-                        System.err.println("Cannot use multiple operation modes.");
-                        System.out.println(commandUsage);
-                        System.exit(-1);
-                    }
+                    if (!(operationMode == null))
+                        LauncherErrorHandle("Cannot use multiple operation modes.");
+
                     operationMode = "standard";
                 }
                 case "--Encrypted-OSPF" -> {
-                    if (!operationMode.equals(""))
-                    {
-                        System.err.println("Cannot use multiple operation modes.");
-                        System.out.println(commandUsage);
-                        System.exit(-1);
-                    }
+                    if (!(operationMode == null))
+                        LauncherErrorHandle("Cannot use multiple operation modes.");
+
                     operationMode = "encrypted";
                 }
                 case "--help", "-help" -> { //Request to see command usage
@@ -81,12 +83,14 @@ public class Launcher {
                     Config.SetConfig(args[i+1]);
                 }
                 case "--remove-config" -> Config.flagFileConfRemove = true;//Argument useful for testing, will remove the config file.
-                default -> { //Arg not found. Invalid use of program.
-                    System.out.println("Argument not recognised: '" + arg + "'.");
-                    System.out.println(commandUsage);
-                    System.exit(-1);
-                }
+                default -> LauncherErrorHandle("Argument not recognised: '" + arg + "'.");//Arg not found. Invalid use of program.
             }
         }
+    }
+
+    private static void LauncherErrorHandle(String message) {
+        System.err.println(message);
+        System.out.println(commandUsage);
+        System.exit(-1);
     }
 }
