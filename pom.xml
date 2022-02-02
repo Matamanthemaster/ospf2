@@ -87,7 +87,7 @@
                         <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>com.mws.prototype.ospf2/com.mws.prototype.ospf2.OspfUIMain</mainClass>
+                            <mainClass>com.mws.prototype.ospf2/com.mws.ospf2.ui.Main</mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
                             <jlinkImageName>app</jlinkImageName>
