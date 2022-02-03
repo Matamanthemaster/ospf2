@@ -6,11 +6,11 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="ospf2" />
+        <module name="dplp" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="ospf2" target="17" />
+      <module name="dplp" target="17" />
     </bytecodeTargetLevel>
   </component>
 </project>

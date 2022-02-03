@@ -6,7 +6,7 @@ module com.mws.prototype.ospf2 {
     requires org.jetbrains.annotations;
     requires java.xml;
     requires inet.ipaddr;
-    
-    exports com.mws.ospf2.ui;
-    opens com.mws.ospf2.ui to javafx.fxml, javafx.graphics;
+
+    exports com.mws.dplp;
+    opens com.mws.dplp to javafx.fxml, javafx.graphics;
 }
