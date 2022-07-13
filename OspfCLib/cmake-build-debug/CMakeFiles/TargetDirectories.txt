@@ -1,0 +1,3 @@
+/home/matthew/CLionProjects/OspfCLib/cmake-build-debug/CMakeFiles/OspfCLib.dir
+/home/matthew/CLionProjects/OspfCLib/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/matthew/CLionProjects/OspfCLib/cmake-build-debug/CMakeFiles/rebuild_cache.dir

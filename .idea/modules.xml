@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/dplp.iml" filepath="$PROJECT_DIR$/dplp.iml" />
+      <module fileurl="file://$PROJECT_DIR$/ospf.iml" filepath="$PROJECT_DIR$/ospf.iml" />
     </modules>
   </component>
 </project>
