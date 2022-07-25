@@ -30,15 +30,15 @@ public class Launcher {
         if (operationMode == null)
             LauncherErrorHandle("Operation mode not specified.");
 
-        //Check operation mode from flags.
+        //Check operation mode from flags, choose appropriate implementation for the PF model.
         if (operationMode.equals("standard"))
             daemonThread = new Thread(StdDaemon::Main);
         else if (operationMode.equals("encrypted"))
             daemonThread = new Thread(EncDaemon::Main);
-
-        if (daemonThread == null)
+        else
             LauncherErrorHandle("Could not create a daemon thread. Launcher.operationMode is null.");
 
+        //Create thread, run thread.
         System.out.println("Daemon Program Run");
         daemonThread.start();
     }
@@ -86,6 +86,22 @@ public class Launcher {
                 default -> LauncherErrorHandle("Argument not recognised: '" + arg + "'.");//Arg not found. Invalid use of program.
             }
         }
+    }
+
+    //https://stackoverflow.com/questions/4113890/how-to-calculate-the-internet-checksum-from-a-byte-in-java
+    public static long IpChecksum(byte[] buffer)
+    {
+        int length = buffer.length;
+        int i = 0;
+        long sum = 0;
+        while (length > 0) {
+            sum += (buffer[i++]&0xff) << 8;
+            if ((--length)==0) break;
+            sum += (buffer[i++]&0xff);
+            --length;
+        }
+
+        return (~((sum & 0xFFFF)+(sum >> 16)))&0xFFFF;
     }
 
     private static void LauncherErrorHandle(String message) {

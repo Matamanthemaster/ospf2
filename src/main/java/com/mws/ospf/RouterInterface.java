@@ -4,6 +4,8 @@ import com.mws.ospf.pdt.InterfaceType;
 import inet.ipaddr.IPAddress;
 import org.jetbrains.annotations.NotNull;
 
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.List;
 
 /**
@@ -42,5 +44,13 @@ public class RouterInterface {
         this.type = type;
         this.bandwidth = type.getBandwidth();
         this.isEnabled = enabled;
+    }
+
+
+    /**
+     * @return NetworkInterface object for the interface.
+     */
+    public NetworkInterface ToNetworkInterface() throws SocketException {
+        return NetworkInterface.getByName(this.name);
     }
 }

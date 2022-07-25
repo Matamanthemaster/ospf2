@@ -6,7 +6,7 @@ module com.mws.ospf {
     requires org.jetbrains.annotations;
     requires java.xml;
     requires inet.ipaddr;
-    requires org.jnrproject.ffi;
+    requires guava;
 
     exports com.mws.ospf;
     opens com.mws.ospf to javafx.fxml, javafx.graphics;

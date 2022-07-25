@@ -3,6 +3,7 @@ package com.mws.ospf;
 import com.mws.ospf.pdt.ExternalStates;
 import inet.ipaddr.IPAddress;
 
+import java.net.DatagramSocket;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -13,6 +14,9 @@ public class NeighbourNode extends Node {
     public Timer timerInactivity;
     public int priority;
     public IPAddress ipAddress;
+
+    //Variable used for unicast datagram communication with this specific neighbour. Used in DBD packet and SLR/U
+    public DatagramSocket unicastSocket;
 
     //variable for reset task, identical for each instance of object, but with the correct reference to the instance of TimerExpire() method.
     //Cannot use lambda because there isn't a wrapper for TimerTask setup.
@@ -26,12 +30,12 @@ public class NeighbourNode extends Node {
     /**
      * Create an instance of Neighbour Node with provided parameters.
      * Used to store information about a specific neighbour.
-     * @param NID the neighbour's advertised router ID
+     * @param rID the neighbour's advertised router ID
      * @param priority the neighbour's advertised priority (MA election)
      * @param ipAddress the neighbour's interface IP address, for unicast messaging
      */
-    public NeighbourNode(short NID, int priority, IPAddress ipAddress) {
-        super(NID);
+    public NeighbourNode(String rID, int priority, IPAddress ipAddress) {
+        super(rID);
         this.priority = priority;
         this.ipAddress = ipAddress;
 
@@ -50,7 +54,7 @@ public class NeighbourNode extends Node {
      */
     private void ResetInactiveTimer() {
         timerInactivity.cancel();
-        timerInactivity.schedule(resetTask, Config.deadInterval);
+        timerInactivity.schedule(resetTask, 40*1000);
     }
 
     /**
@@ -60,5 +64,6 @@ public class NeighbourNode extends Node {
     private void TimerExpire() {
         state = ExternalStates.DOWN;
         timerInactivity.cancel();
+        unicastSocket.close();
     }
 }

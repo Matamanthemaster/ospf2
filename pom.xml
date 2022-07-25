@@ -66,19 +66,14 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>com.github.omkamra</groupId>
-            <artifactId>jnr</artifactId>
-            <version>0.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.jnr</groupId>
-            <artifactId>jnr-ffi</artifactId>
-            <version>2.2.12</version>
-        </dependency>
-        <dependency>
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
             <version>9.3</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>31.1-jre</version>
         </dependency>
     </dependencies>
 

@@ -37,16 +37,15 @@ public class Config {
 
     private static File fileConfig = null; //File reference, for IO Operations
     static ThisNode thisNode;
-    static int deadInterval;
-    static int helloInterval;
     static boolean flagFileConfRemove;
 
     //Not part of the config, part of the daemons. Accessible to all here.
-    static NeighboursTable neighboursTable;
+    static List<NeighbourNode> neighboursTable;
     static LSDB lsdb;
 
     /**
      * Set method for the OSPF config, that uses the default config file path.
+     * Creates a file if it doesn't already exist.
      * Creates a file if it doesn't already exist.
      * Also populates local variables with values from the config.
      * Default path: ./ospf.conf.xml
@@ -94,8 +93,7 @@ public class Config {
      * Create a .conf.xml file with sensible first-time default values. Uses file path in 'Config.fileConfig'.
      */
     private static void MakeConfig() throws SocketException, UnknownHostException, AddressStringException {
-        helloInterval = 10;
-        deadInterval = 40;
+
         List<RouterInterface> routerInterfaces = new ArrayList<>(Collections.emptyList());
 
         //Loop over each network interface, building a default RouterInterface object
@@ -129,7 +127,7 @@ public class Config {
             ));
         }
 
-        thisNode = new ThisNode((short)0001, "Router", routerInterfaces);
+        thisNode = new ThisNode("0001", "Router", routerInterfaces);
 
         WriteConfig();
         System.out.println("The config file has been made for the first time. Please change the config file at '" +
@@ -145,8 +143,6 @@ public class Config {
     <config>
         <Hostname>R1</Hostname>
         <NID>0001</NID>
-        <HelloInterval>10</helloInterval>
-        <DeadInterval>40</deadInterval>
         <interfaces>
             <enp5s0>
                 <IPv4>192.168.1.20/24</IPv4>
@@ -187,22 +183,13 @@ public class Config {
 
             //get global config information, hostname
             String hostname = configDocument.getElementsByTagName("Hostname").item(0).getTextContent();
-            try {
-                deadInterval = Integer.parseInt(configDocument.getElementsByTagName("DeadInterval")
-                        .item(0).getTextContent());
-                helloInterval = Integer.parseInt(configDocument.getElementsByTagName("HelloInterval")
-                        .item(0).getTextContent());
-            } catch (NumberFormatException ex) {
-                ConfigErrorHandle("The dead interval and hello interval in the config are not both integers, and so the" +
-                        "config file is invalid.\n\rPlease change DeadInterval or HelloInterval.");
-            }
+
 
 
 
             //variables required to create ThisNode. NID is easy to make, Interfaces list is more complex, requiring
             // looping over XML elements.
-            short nid = Short.parseShort(configDocument.getElementsByTagName("NID").item(0)
-                    .getTextContent());
+            String rid = configDocument.getElementsByTagName("NID").item(0).getTextContent();
             List<RouterInterface> confInterfaces = new ArrayList<>();
 
             //Go into the interfaces element, loop over each child, getting all children of each interface and storing
@@ -248,8 +235,11 @@ public class Config {
                 //Build an individual interface, and add it to the interfaces list.
                 confInterfaces.add(new RouterInterface(curIntName, curIntIPv4, curIntIPv6s, curIntType, curIntEnabled));
             }
-            //Finally, take all the work we've done, create this node from NID and the interfaces in the config file.
-            thisNode = new ThisNode(nid, hostname, confInterfaces);
+            //Finally, take all the work we've done, create this node from rid and the interfaces in the config file.
+            //Also init tables.
+            thisNode = new ThisNode(rid, hostname, confInterfaces);
+            neighboursTable = Collections.emptyList();
+            lsdb = new LSDB();
 
         } catch (ParserConfigurationException | SAXException | IOException | AddressStringException e) {
             e.printStackTrace();
@@ -289,15 +279,7 @@ public class Config {
 
             //setup nid element. Set nid text content to the stored config.
             Element confNID = GetConfigElementFromRoot(confDoc, confRoot, "NID");
-            confNID.setTextContent(String.valueOf(thisNode.NID));
-
-            //Setup HelloInterval
-            Element confHelloInterval = GetConfigElementFromRoot(confDoc, confRoot, "HelloInterval");
-            confHelloInterval.setTextContent(String.valueOf(helloInterval));
-
-            //Setup DeadInterval
-            Element confDeadInterval = GetConfigElementFromRoot(confDoc, confRoot, "DeadInterval");
-            confDeadInterval.setTextContent(String.valueOf(deadInterval));
+            confNID.setTextContent(String.valueOf(thisNode.rID));
 
             //Create interfaces root.
             Element confInterfacesRoot = GetConfigElementFromRoot(confDoc, confRoot, "interfaces");

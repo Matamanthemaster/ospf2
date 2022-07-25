@@ -7,8 +7,8 @@ public class ThisNode extends Node {
     List<RouterInterface> interfaceList;
     String hostname;
 
-    public ThisNode(short NID, String hostname, List<RouterInterface> interfaceList) {
-        super(NID);
+    public ThisNode(String rID, String hostname, List<RouterInterface> interfaceList) {
+        super(rID);
         this.interfaceList = interfaceList;
         this.hostname = hostname;
     }
