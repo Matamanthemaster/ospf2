@@ -127,7 +127,7 @@ public class Config {
             ));
         }
 
-        thisNode = new ThisNode("0001", "Router", routerInterfaces);
+        thisNode = new ThisNode("0.0.0.1", "Router", routerInterfaces);
 
         WriteConfig();
         System.out.println("The config file has been made for the first time. Please change the config file at '" +
@@ -142,7 +142,7 @@ public class Config {
     E.g.
     <config>
         <Hostname>R1</Hostname>
-        <NID>0001</NID>
+        <RID>0.0.0.1</RID>
         <interfaces>
             <enp5s0>
                 <IPv4>192.168.1.20/24</IPv4>
@@ -187,16 +187,19 @@ public class Config {
 
 
 
-            //variables required to create ThisNode. NID is easy to make, Interfaces list is more complex, requiring
+            //variables required to create ThisNode. RID is easy to make, Interfaces list is more complex, requiring
             // looping over XML elements.
-            String rid = configDocument.getElementsByTagName("NID").item(0).getTextContent();
+            String rid = configDocument.getElementsByTagName("RID").item(0).getTextContent();
             List<RouterInterface> confInterfaces = new ArrayList<>();
 
             //Go into the interfaces element, loop over each child, getting all children of each interface and storing
             // them in the RouterInterface object 'confInterfaces'.
-            NodeList confIntRoot = configDocument.getElementsByTagName("Interfaces");
-            for (int i = 0; i < confIntRoot.getLength(); i++) {
-                Node curInt = confIntRoot.item(i);
+            Node confIntRoot = configDocument.getElementsByTagName("interfaces").item(0);
+            NodeList confIntRootChildren = confIntRoot.getChildNodes();
+            for (int i = 0; i < confIntRootChildren.getLength(); i++) {
+                Node curInt = confIntRootChildren.item(i);
+                if (curInt.getNodeName() == "#text")
+                    continue;
                 NodeList curIntVars = curInt.getChildNodes();
 
                 //Vars to store values before the loop, so they always have some value.
@@ -215,7 +218,7 @@ public class Config {
                         case "IPv6" -> curIntIPv6s.add(new IPAddressString(curIntVarValue).toAddress());
                         case "Type" -> curIntType = InterfaceType.fromString(curIntVarValue);
                         case "Enabled" -> {
-                            if (curIntVarValue.equals("True"))
+                            if (curIntVarValue.equals("true"))
                                 curIntEnabled = true;
                         }
                         //don't care if extra values exist (default branch).
@@ -226,7 +229,7 @@ public class Config {
                 if (curIntIPv4 == null)
                     ConfigErrorHandle("Unexpected value: interface \"" + curIntName + "\"'s IPv4 address doesn't exist" +
                             " in the config file. IPv4 is required for ipv4. Please add 'IPv4' child with a valid" +
-                            "value");
+                            " value");
                 if (curIntType == null)
                     ConfigErrorHandle("Unexpected value: interface \"" + curIntName + "\"'s interface type doesn't" +
                             " exist in the config file. Please add 'Type' child with a valid value.");
@@ -278,8 +281,8 @@ public class Config {
             confHostname.setTextContent(thisNode.hostname);
 
             //setup nid element. Set nid text content to the stored config.
-            Element confNID = GetConfigElementFromRoot(confDoc, confRoot, "NID");
-            confNID.setTextContent(String.valueOf(thisNode.rID));
+            Element configRID = GetConfigElementFromRoot(confDoc, confRoot, "RID");
+            configRID.setTextContent(String.valueOf(thisNode.GetRID()));
 
             //Create interfaces root.
             Element confInterfacesRoot = GetConfigElementFromRoot(confDoc, confRoot, "interfaces");

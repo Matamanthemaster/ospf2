@@ -1,8 +1,9 @@
 package com.mws.ospf;
 
 import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
+import inet.ipaddr.IPAddress;
+import inet.ipaddr.IPAddressNetwork;
 
 import java.io.IOException;
 import java.net.*;
@@ -14,6 +15,7 @@ import java.util.TimerTask;
 public class StdDaemon {
 
     private static MulticastSocket socketHello;
+    private static InetSocketAddress socAddrHello;
     private static Timer timerHelloSend;
     private static Thread threadHelloListen;
 
@@ -21,13 +23,12 @@ public class StdDaemon {
         //Set helloSocket, used for multicasting. Binds the ospf multicast address to all interfaces using this socket.
         socketHello = null;
         try {
-            InetAddress ipDest = InetAddress.getByName("224.0.0.5");
-            InetSocketAddress ipDestSocket = new InetSocketAddress(ipDest, 25565);
-            socketHello = new MulticastSocket(25565);
+            socAddrHello = new InetSocketAddress(InetAddress.getByName("224.0.0.5"), 25565);
+            socketHello = new MulticastSocket(socAddrHello.getPort());
             socketHello.setTimeToLive(1);
 
             for (RouterInterface rInt : Config.thisNode.interfaceList) {
-                socketHello.joinGroup(ipDestSocket, rInt.ToNetworkInterface());
+                socketHello.joinGroup(socAddrHello, rInt.ToNetworkInterface());
             }
         } catch (UnknownHostException ex) {
             //InetAddress.getByName()
@@ -72,11 +73,7 @@ public class StdDaemon {
 
         //Create a datagram packet to send, send it out all network interfaces.
         try {
-            DatagramPacket helloPacket = new DatagramPacket(helloBuffer,
-                    helloBuffer.length,
-                    InetAddress.getByName("224.0.0.5"),
-                    25565);
-
+            DatagramPacket helloPacket = new DatagramPacket(helloBuffer, helloBuffer.length, socAddrHello);
             for (RouterInterface rInt: Config.thisNode.interfaceList) {
                 socketHello.setNetworkInterface(rInt.ToNetworkInterface());
                 socketHello.send(helloPacket);
@@ -85,7 +82,7 @@ public class StdDaemon {
             DaemonErrorHandle("Unknown host when creating datagram packet. Java couldn't resolve the host" +
                     "224.0.0.5 somehow? This shouldn't be possible", ex);
         } catch (IOException ex) {
-            DaemonErrorHandle("IOException when sending hello datagram packet" + ex.getMessage(), ex);
+            DaemonErrorHandle("IOException when sending hello datagram packet", ex);
         }
 
         //Schedule next run to execute the same method, based on the hello timer interval.
@@ -97,20 +94,23 @@ public class StdDaemon {
         }, 10 * 1000);
     }
 
-    public static void HelloReceiveThread()
-    {
+    public static void HelloReceiveThread() {
         //Buffer for raw data.
         byte[] returnB = new byte[500];
         DatagramPacket returnP = new DatagramPacket(returnB, returnB.length);
 
+        System.out.println("Receive Thread Before Loop");//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         //Only runs if not interrupted. If interrupted thread will end execution. To cancel, interrupt.
-        while (Thread.currentThread().isInterrupted()) {
+        while (!Thread.currentThread().isInterrupted()) {
+
+            System.out.println("Receive Thread Loop");//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
             try {
                 socketHello.receive(returnP);
             } catch (IOException ex) {
                 DaemonErrorHandle("Exception on CheckHelloBuffer receive", ex);
             }
 
+            System.out.println("DEBUG: Packet received");//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 
             //verify single byte values, saves adv. processing if basic fields are wrong.
@@ -130,18 +130,41 @@ public class StdDaemon {
             Get bytes from the packet buffer. Starts from 2 inc., to byte 4 exclu. This length is trusted and used
             for the rest of this handle. Don't need to verify if correct, as checksum will do that based on this
             length value.*/
-            int pLength = Shorts.fromByteArray(Arrays.copyOfRange(returnB, 2, 4));
-
+            int pLength = Short.toUnsignedInt(Shorts.fromByteArray(Arrays.copyOfRange(returnB, 2, 4)));
+            System.out.println(pLength);//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
             byte[] packetBuffer = Arrays.copyOfRange(returnB, 0, pLength);
 
             //Get checksum. Bytes 12, 13
-            long pChecksum = Longs.fromByteArray(Arrays.copyOfRange(returnB,12, 14));
+            long pChecksum = Short.toUnsignedLong(Shorts.fromByteArray(Arrays.copyOfRange(returnB,12, 14)));
+            System.out.println(pChecksum);//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
             //verify checksums. If wrong, print special message. Important for debugging.
             if (pChecksum != Launcher.IpChecksum(packetBuffer)) {
-                System.err.println("Hello packet checksum mismatch. Got " + pChecksum + ", expected " + Launcher.IpChecksum(packetBuffer));
+                System.err.println("Hello packet checksum mismatch. Got " + pChecksum + ", expected " +
+                        Launcher.IpChecksum(packetBuffer));
                 continue;
             }
+            //TODO: CHECKSUM MISSMATCH CHECK
+
+
+
+
+
+            //Packet has been verified and is correct.
+
+            //RID in bytes 4,5,6,7 to string
+            //WARNING: java strikes again with only signed types.
+            String neighbourRID = (char) returnB[4] + "." +
+                    (char) returnB[5] + "." +
+                    (char) returnB[6] + "." +
+                    (char) returnB[7];
+
+            int neighbourPriority = Integer.parseUnsignedInt(returnB[31] + "");
+            IPAddress neighbourIP = new IPAddressNetwork.IPAddressGenerator().from(returnP.getAddress());
+
+            NeighbourNode newNeighbour = new NeighbourNode(neighbourRID, neighbourPriority, neighbourIP);
+            System.out.println("Recieved packet from neighbour, with valid checksum. Neighbour ID: " +
+                    newNeighbour.GetRID());//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         }
 
     }
@@ -179,11 +202,11 @@ public class StdDaemon {
 
         //Update router ID (4, 5, 6, 7)
         try {
-            byte[] ridBytes = Config.thisNode.rID.getBytes();
-            ospfBuffer[4] = ridBytes[0];
-            ospfBuffer[5] = ridBytes[1];
-            ospfBuffer[6] = ridBytes[2];
-            ospfBuffer[7] = ridBytes[3];
+            byte[] rID = Config.thisNode.GetRIDBytes();
+            ospfBuffer[4] = rID[0];
+            ospfBuffer[5] = rID[1];
+            ospfBuffer[6] = rID[2];
+            ospfBuffer[7] = rID[3];
         } catch (Exception ex)  {
             DaemonErrorHandle("Error when creating an OSPF packet: Substituting in router ID.", ex);
         }
@@ -198,11 +221,11 @@ public class StdDaemon {
         for (int i = 0; i < Config.neighboursTable.size(); i++)
         {
             Node neighbour = Config.neighboursTable.get(i);
-            byte[] rIDBytes = neighbour.rID.getBytes();
-            neighboursBuffer[byteOffset] = rIDBytes[0];
-            neighboursBuffer[byteOffset + 1] = rIDBytes[1];
-            neighboursBuffer[byteOffset + 2] = rIDBytes[2];
-            neighboursBuffer[byteOffset + 3] = rIDBytes[3];
+            byte[] rID = neighbour.GetRIDBytes();
+            neighboursBuffer[byteOffset] = rID[0];
+            neighboursBuffer[byteOffset + 1] = rID[1];
+            neighboursBuffer[byteOffset + 2] = rID[2];
+            neighboursBuffer[byteOffset + 3] = rID[3];
 
             byteOffset += 4;
         }

@@ -12,7 +12,7 @@ public class UIController {
     @FXML
     protected void initialize()
     {
-        txtRID.setText(String.valueOf(Config.thisNode.rID));
+        txtRID.setText(String.valueOf(Config.thisNode.GetRID()));
         System.out.println(this + ".initialize()");
     }
 

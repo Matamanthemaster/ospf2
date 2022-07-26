@@ -34,7 +34,7 @@ public class RouterInterface {
      * @param enabled interface status, is it up
      * @throws IllegalArgumentException name contains invalid characters
      */
-    public RouterInterface(@NotNull String name, IPAddress ipv4, List<IPAddress> ipv6, InterfaceType type, Boolean enabled) {
+    public RouterInterface(@NotNull String name, IPAddress ipv4, List<IPAddress> ipv6, InterfaceType type, boolean enabled) {
         if (name.contains(" "))
             throw new IllegalArgumentException();
 
@@ -44,6 +44,8 @@ public class RouterInterface {
         this.type = type;
         this.bandwidth = type.getBandwidth();
         this.isEnabled = enabled;
+
+        //PrintAllValuesToSTDOut();//Debug Line, verify data is correct.
     }
 
 
@@ -52,5 +54,18 @@ public class RouterInterface {
      */
     public NetworkInterface ToNetworkInterface() throws SocketException {
         return NetworkInterface.getByName(this.name);
+    }
+
+    /**
+     * Testing method to be thrown into constructor.
+     */
+    private void PrintAllValuesToSTDOut() {
+        System.out.println(this.name);
+        System.out.println("    " + this.addrIPv4.toString());
+        for (IPAddress a: this.addrIPv6) {
+            System.out.println("    " + a.toString());
+        }
+        System.out.println("    " + this.type.toString());
+        System.out.println("    " + this.isEnabled.toString());
     }
 }
