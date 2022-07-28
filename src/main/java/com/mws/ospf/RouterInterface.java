@@ -6,6 +6,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -13,6 +14,19 @@ import java.util.List;
  */
 public class RouterInterface {
 
+    //STATIC COMPONENTS
+    private static List<RouterInterface> _RouterInterfaces = new ArrayList<>();
+
+    public static RouterInterface GetInterfaceByIP(IPAddress ip) {
+        for(RouterInterface r: _RouterInterfaces)
+        {
+            if (r.addrIPv4.toInetAddress().equals(ip.toInetAddress()))
+                return r;
+        }
+        return null;
+    }
+
+    //OBJECT COMPONENTS
     public String getName() {
         return name;
     }
@@ -22,7 +36,6 @@ public class RouterInterface {
     public List<IPAddress> addrIPv6;//List of addresses assigned to a router interface.
     public InterfaceType type; //Interface type identifier. Used by code to determine what type of interface it is. Uses enum
     public Boolean isEnabled; //Interface on?
-    public Boolean isPassive; //Does the interface send routing updates?
     public long bandwidth; //BW used by default OSPF calculation, derived from interface type in constructor.
 
     /**
@@ -44,6 +57,8 @@ public class RouterInterface {
         this.type = type;
         this.bandwidth = type.getBandwidth();
         this.isEnabled = enabled;
+
+        _RouterInterfaces.add(this);
 
         //PrintAllValuesToSTDOut();//Debug Line, verify data is correct.
     }

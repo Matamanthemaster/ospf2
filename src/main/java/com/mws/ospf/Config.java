@@ -30,45 +30,40 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 
-/**
-* Class to store the OSPF config file reference, and values in java data types.
+/**<p><h1>Application Configuration</h1></p>
+* <p>Class to store the OSPF config file reference, and values in java data types.</p>
 */
 public class Config {
 
+    //region STATIC PROPERTIES
     private static File fileConfig = null; //File reference, for IO Operations
-    static ThisNode thisNode;
     static boolean flagFileConfRemove;
-
-    //Not part of the config, part of the daemons. Accessible to all here.
+    static ThisNode thisNode;//Accessible to all here.
     static List<NeighbourNode> neighboursTable;
     static LSDB lsdb;
+    //endregion
 
-    /**
-     * Set method for the OSPF config, that uses the default config file path.
-     * Creates a file if it doesn't already exist.
-     * Creates a file if it doesn't already exist.
-     * Also populates local variables with values from the config.
-     * Default path: ./ospf.conf.xml
+    //region STATIC METHODS
+    /**<p><h1>Set Config File</h1></p>
+     * <p>Set method for the OSPF config, that uses the default config file path. Creates a file if it doesn't already exist. Also populates local variables with values from the config</p>
+     * <p></p>
+     * <p>Uses default path: ./ospf.conf.xml</p>
      */
     static void SetConfig() {
         CommonMain(System.getProperty("user.dir") + System.getProperty("file.separator") + "ospf.conf.xml");
     }
 
-    /**
-     * Set method for OSPF config that takes a specific config file path.
-     * Set method for OSPF config that takes a specific config file path.
-     * Creates a config file if it doesn't already exist.
-     * Also populates local variables with values from the config.
-     *
+    /**<p><h1>Set Config File</h1></p>
+     * <p>Set method for OSPF config that takes a specific config file path. Creates a config file if it doesn't
+     * already exist. Also populates local variables with values from the config.</p>
      * @param path config file path
      */
     static void SetConfig(String path) {
         CommonMain(path);
     }
 
-    /**
-     * Main start method that performs the common jobs, instead of copying code between set methods.
-     *
+    /**<p><h1>Config Main Method</h1></p>
+     * <p>Main start method that performs the common jobs, instead of copying code between set methods.</p>
      * @param path Config file path
      */
     private static void CommonMain(String path) {
@@ -89,8 +84,11 @@ public class Config {
         ReadConfig();
     }
 
-    /**
-     * Create a .conf.xml file with sensible first-time default values. Uses file path in 'Config.fileConfig'.
+    /**<p><h1>Generate Config</h1></p>
+     * <p>Populates the config file static class properties with starting data. Data is derived from the machine details,
+     * such as interface name and assigned IP addresses. Calls static void WriteConfig() to save sensible defaults to
+     * a config file with path specified to CommonMain</p>
+     * <p>>Uses file path in static File property 'Config.fileConfig'.</p>
      */
     private static void MakeConfig() throws SocketException, UnknownHostException, AddressStringException {
 
@@ -135,8 +133,8 @@ public class Config {
         System.exit(0);
     }
 
-    /*
-    Desired format of XML document.
+    //CONFIG XML FILE FORMAT
+    /*Desired format of XML document.
     tags used to store tags: lowercase.
     tags used to store information: UpperCammelCase
     E.g.
@@ -159,10 +157,10 @@ public class Config {
                 <Enabled>True</Enabled>
             </enp5s0>
         </interfaces>
-    </config>
-     */
-    /**
-     * Populates Config class static values from the config file stored in 'Config.fileConfig'.
+    </config>*/
+    /**<p><h1>Read Config File</h1></p>
+     * <p>Reads data from the config file stored in static File 'Config.fileConfig'. Populates application config class
+     * properties with data from the config xml document file.</p>
      */
     static void ReadConfig() {
         if (!ConfigExists())
@@ -198,7 +196,7 @@ public class Config {
             NodeList confIntRootChildren = confIntRoot.getChildNodes();
             for (int i = 0; i < confIntRootChildren.getLength(); i++) {
                 Node curInt = confIntRootChildren.item(i);
-                if (curInt.getNodeName() == "#text")
+                if (curInt.getNodeName().equals("#text"))
                     continue;
                 NodeList curIntVars = curInt.getChildNodes();
 
@@ -250,8 +248,10 @@ public class Config {
         }
     }
 
-    /**
-     * Take static variables stored in Config and write them to the XML file.
+    /**<p><h1>Write Config File</h1></p>
+     * <p>Takes static variables defined in this class and writes them to the config.xml file specified in static File
+     * 'Config.fileConfig'. Datastructures stored statically in the config class are formatted with tags in the specific
+     * structure, pictured above ReadConfig().</p>
      */
     static void WriteConfig() {
         try {
@@ -277,24 +277,24 @@ public class Config {
                 confRoot = (Element) confDoc.getElementsByTagName("config").item(0);
 
             //Setup hostname element. Set hostname text content to the stored config.
-            Element confHostname = GetConfigElementFromRoot(confDoc, confRoot, "Hostname");
+            Element confHostname = _GetConfigElementFromRoot(confDoc, confRoot, "Hostname");
             confHostname.setTextContent(thisNode.hostname);
 
             //setup nid element. Set nid text content to the stored config.
-            Element configRID = GetConfigElementFromRoot(confDoc, confRoot, "RID");
+            Element configRID = _GetConfigElementFromRoot(confDoc, confRoot, "RID");
             configRID.setTextContent(String.valueOf(thisNode.GetRID()));
 
             //Create interfaces root.
-            Element confInterfacesRoot = GetConfigElementFromRoot(confDoc, confRoot, "interfaces");
+            Element confInterfacesRoot = _GetConfigElementFromRoot(confDoc, confRoot, "interfaces");
 
             //Now the harder part. Create interfaces.
             for (RouterInterface curRInt: thisNode.interfaceList)
             {
                 //Current interface element (e.g. <enp5s0></enp5s0>)
-                Element confCurRInt = GetConfigElementFromRoot(confDoc, confInterfacesRoot, curRInt.getName());
+                Element confCurRInt = _GetConfigElementFromRoot(confDoc, confInterfacesRoot, curRInt.getName());
 
                 //IPv4 Address (e.g. 192.168.1.20/24)
-                Element confCurRIntIPv4 = GetConfigElementFromRoot(confDoc, confCurRInt, "IPv4");
+                Element confCurRIntIPv4 = _GetConfigElementFromRoot(confDoc, confCurRInt, "IPv4");
                 confCurRIntIPv4.setTextContent(curRInt.addrIPv4.toPrefixLengthString());
 
                 //IPv6 Address. First remove all existing elements, then recreate elements. This is the simplest way.
@@ -312,11 +312,11 @@ public class Config {
                 }
 
                 //InterfaceType (e.g. T1)
-                Element confCurRIntType = GetConfigElementFromRoot(confDoc, confCurRInt, "Type");
+                Element confCurRIntType = _GetConfigElementFromRoot(confDoc, confCurRInt, "Type");
                 confCurRIntType.setTextContent(curRInt.type.toString());
 
                 //Enabled state (e.g. true)
-                Element confCurRintEnabled = GetConfigElementFromRoot(confDoc, confCurRInt, "Enabled");
+                Element confCurRintEnabled = _GetConfigElementFromRoot(confDoc, confCurRInt, "Enabled");
                 confCurRintEnabled.setTextContent(String.valueOf(curRInt.isEnabled));
             }
 
@@ -332,14 +332,15 @@ public class Config {
         }
     }
 
-    /**
-     * Get a DOM element for a specified tag, limit one tag. If the tag exists, get that existing tag. Tag will be created if it doesn't exist.
+    /**<p><h1>Get XML Element Helper</h1></p>
+     * <p>Get a DOM element for a specified tag, limit one tag. If the tag exists, get that existing tag. Tag will be created if it doesn't exist.</p>
+     * <p>Used internally to read and write DOM xml document.</p>
      * @param confDoc the DOM document, used for creating elements
      * @param rootElement the root DOM element where operations are preformed on
      * @param tagName the tag to get from the parent
      * @return the requested child DOM element, from tag name
      */
-    private static Element GetConfigElementFromRoot(@NotNull Document confDoc, @NotNull Element rootElement, @NotNull String tagName) {
+    private static Element _GetConfigElementFromRoot(@NotNull Document confDoc, @NotNull Element rootElement, @NotNull String tagName) {
         Element newElement;
         if (rootElement.getElementsByTagName(tagName).getLength() == 0)//Set element
         {
@@ -350,9 +351,9 @@ public class Config {
         return newElement;
     }
 
-    /**
-     * Determine the status of the config file.
-     * @return true if the file is set in the config and exists.
+    /**<p><h1>Check Config Exists</h1></p>
+     * <p>Determine the status of the config file</p>
+     * @return true if the file is set in the config and exists
      */
     static boolean ConfigExists() {
         if (fileConfig == null)
@@ -363,13 +364,13 @@ public class Config {
         return fileConfig.exists();
     }
 
-    /**
-     * More graceful and standard exit to the Config class, usually during exception handling.
+    /**<p><h1>Error Handle (Config)</h1></p>
+     * <p>More graceful and standard exit to the Config class, usually during exception handling</p>
      * @param message the message to display to the user
      */
-    private static void ConfigErrorHandle(String message)
-    {
+    private static void ConfigErrorHandle(String message) {
         System.err.println(message);
         System.exit(-2);
     }
+    //endregion
 }

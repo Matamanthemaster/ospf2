@@ -1,11 +1,21 @@
 package com.mws.ospf;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Base class for NeighbourNode and ThisNode. stores the common variables between both extend classes.
  */
 public abstract class Node {
+    /*
+     * OBJECT PROPERTIES
+     */
     private String rID; //Router ID, a 32-bit integer represented in dotted decimal, identically to an IPv4 address.
+    public List<String> knownNeighbours = new ArrayList<>();
 
+    /*
+     * OBJECT METHODS
+     */
     /**<p><h1>Node</h1></p>
      * <p>Construct a generic node with a specified rID that matches constraints of dotted decimal</p>
      * <p></p>
@@ -54,6 +64,17 @@ public abstract class Node {
      */
     public String GetRID() {
         return this.rID;
+    }
+
+    public String GetKnownNeighboursString() {
+        String neighbours = "";
+        for (String neighbour: knownNeighbours)
+        {
+            neighbours += neighbour + ",";
+        }
+        neighbours = neighbours.substring(0, neighbours.length()-1);
+        System.out.println(neighbours);
+        return neighbours;
     }
 
     /**<p><h1>Get RID as Bytes</h1></p>

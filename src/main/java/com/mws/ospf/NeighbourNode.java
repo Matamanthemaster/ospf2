@@ -4,28 +4,38 @@ import com.mws.ospf.pdt.ExternalStates;
 import inet.ipaddr.IPAddress;
 
 import java.net.DatagramSocket;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class NeighbourNode extends Node {
 
+    //STATIC COMPONENTS
+    private static List<NeighbourNode> _NeighbourNodes = new ArrayList<>();
+
+    public static NeighbourNode GetNeighbourNodeByRID(String rid) {
+        for (NeighbourNode n : _NeighbourNodes) {
+            if (n.GetRID().equals(rid)) {
+                return n;
+            }
+        }
+        return null;
+    }
+
+    //OBJECT COMPONENTS
+
     //Information about a neighbour, mostly defined by RFC2328
     public ExternalStates state;
+
+    //Start the inactivity timer, as the neighbour is now known and could become inactive.
     public Timer timerInactivity;
+    private boolean flagTimerInactRunning = false;
     public int priority;
     public IPAddress ipAddress;
 
     //Variable used for unicast datagram communication with this specific neighbour. Used in DBD packet and SLR/U
     public DatagramSocket unicastSocket;
-
-    //variable for reset task, identical for each instance of object, but with the correct reference to the instance of TimerExpire() method.
-    //Cannot use lambda because there isn't a wrapper for TimerTask setup.
-    private final TimerTask resetTask = new TimerTask() {
-        @Override
-        public void run() {
-            TimerExpire();
-        }
-    };
 
     /**
      * Create an instance of Neighbour Node with provided parameters.
@@ -39,22 +49,33 @@ public class NeighbourNode extends Node {
         this.priority = priority;
         this.ipAddress = ipAddress;
 
-        //Assume if we have a neighbour, we have a neighbour packet that has passed challange-response,
-        //and so they are in Hello-A state.
-        state = ExternalStates.HELLO_A;
+        //Neighbour just added to neighbours, init state.
+        this.state = ExternalStates.INIT;
 
-        //Start the inactivity timer, as the neighbour is now known and could become inactive.
-        timerInactivity = new Timer();
         ResetInactiveTimer();
+
+        _NeighbourNodes.add(this);
     }
 
-    /**
-     * Reset the inactive timer.
-     * First cancels any existing timers, then schedules the next timer.
+    /**<p>Reset Inactivity</p>
+     * <p>Refreshes the activity timer on this neighbour. Clears any existing inactivity timer already running and
+     * schedules a new timer with the delay of the inactivity timer</p>
      */
-    private void ResetInactiveTimer() {
-        timerInactivity.cancel();
-        timerInactivity.schedule(resetTask, 40*1000);
+    void ResetInactiveTimer() {
+        if (flagTimerInactRunning) {
+            timerInactivity.cancel();
+        }
+
+        timerInactivity = new Timer(this.GetRID() + "-ResetTimer");
+        timerInactivity.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                TimerExpire();
+            }
+        }, 40*1000);
+        System.out.println("Timer Reset: " + this.GetRID());//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+        flagTimerInactRunning = true;
     }
 
     /**
@@ -63,7 +84,12 @@ public class NeighbourNode extends Node {
      */
     private void TimerExpire() {
         state = ExternalStates.DOWN;
-        timerInactivity.cancel();
-        unicastSocket.close();
+        try {
+            timerInactivity.cancel();
+        } catch (IllegalStateException ignored) {}//IllegalStateException: Timer already cancelled.
+        System.err.println("Timer expired: " + this.GetRID());//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        if (unicastSocket != null)
+            if (!unicastSocket.isClosed())
+               unicastSocket.close();
     }
 }

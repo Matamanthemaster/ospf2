@@ -17,7 +17,9 @@ public class StdDaemon {
     private static MulticastSocket socketHello;
     private static InetSocketAddress socAddrHello;
     private static Timer timerHelloSend;
-    private static Thread threadHelloListen;
+
+    //Setup thread for hello multicast server
+    private static Thread threadHelloListen = new Thread(StdDaemon::HelloReceiveThread, "Thread-Hello-Receive");
 
     static void Main() {
         //Set helloSocket, used for multicasting. Binds the ospf multicast address to all interfaces using this socket.
@@ -62,8 +64,6 @@ public class StdDaemon {
             }
         }, 0);
 
-        //Setup thread for hello multicast server
-        threadHelloListen = new Thread(StdDaemon::HelloReceiveThread);
         threadHelloListen.start();
     }
 
@@ -96,30 +96,41 @@ public class StdDaemon {
 
     public static void HelloReceiveThread() {
         //Buffer for raw data.
-        byte[] returnB = new byte[500];
-        DatagramPacket returnP = new DatagramPacket(returnB, returnB.length);
+        byte[] pBytes = new byte[500];
+        DatagramPacket pReturned = new DatagramPacket(pBytes, pBytes.length);
 
-        System.out.println("Receive Thread Before Loop");//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        //TODO: Finish adding known neighbours. Next two lines for debug
+        Config.thisNode.knownNeighbours.add("");//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        Config.thisNode.GetKnownNeighboursString();//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
         //Only runs if not interrupted. If interrupted thread will end execution. To cancel, interrupt.
         while (!Thread.currentThread().isInterrupted()) {
 
-            System.out.println("Receive Thread Loop");//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
             try {
-                socketHello.receive(returnP);
+                socketHello.receive(pReturned);
             } catch (IOException ex) {
                 DaemonErrorHandle("Exception on CheckHelloBuffer receive", ex);
             }
 
-            System.out.println("DEBUG: Packet received");//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+            //Get value used multiple times, source IP.
+            InetAddress pSource = pReturned.getAddress();
+
+            //Check this node was not the source
+            if (RouterInterface.GetInterfaceByIP(new IPAddressNetwork.IPAddressGenerator().from(pSource)) != null)
+                continue;
+
+
+
 
 
             //verify single byte values, saves adv. processing if basic fields are wrong.
 
             //proto version (2)
-            if (returnB[0] != 0x02)
+            if (pBytes[0] != 0x02)
                 continue;
             //message type (hello)
-            if (returnB[1] != 0x01)
+            if (pBytes[1] != 0x01)
                 continue;
 
 
@@ -130,21 +141,20 @@ public class StdDaemon {
             Get bytes from the packet buffer. Starts from 2 inc., to byte 4 exclu. This length is trusted and used
             for the rest of this handle. Don't need to verify if correct, as checksum will do that based on this
             length value.*/
-            int pLength = Short.toUnsignedInt(Shorts.fromByteArray(Arrays.copyOfRange(returnB, 2, 4)));
-            System.out.println(pLength);//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-            byte[] packetBuffer = Arrays.copyOfRange(returnB, 0, pLength);
+            int pLength = Short.toUnsignedInt(Shorts.fromByteArray(Arrays.copyOfRange(pBytes, 2, 4)));
+            byte[] packetBuffer = Arrays.copyOfRange(pBytes, 0, (pLength));
 
             //Get checksum. Bytes 12, 13
-            long pChecksum = Short.toUnsignedLong(Shorts.fromByteArray(Arrays.copyOfRange(returnB,12, 14)));
-            System.out.println(pChecksum);//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            long pChecksum = Short.toUnsignedLong(Shorts.fromByteArray(Arrays.copyOfRange(pBytes,12, 14)));
 
-            //verify checksums. If wrong, print special message. Important for debugging.
+            packetBuffer[12] = packetBuffer[13] = 0;//Unset checksum, so checksum calc will be correct.
+
+            //verify checksums. If wrong, print special message. Important for debugging, inform server of line error.
             if (pChecksum != Launcher.IpChecksum(packetBuffer)) {
                 System.err.println("Hello packet checksum mismatch. Got " + pChecksum + ", expected " +
                         Launcher.IpChecksum(packetBuffer));
                 continue;
             }
-            //TODO: CHECKSUM MISSMATCH CHECK
 
 
 
@@ -152,20 +162,37 @@ public class StdDaemon {
 
             //Packet has been verified and is correct.
 
-            //RID in bytes 4,5,6,7 to string
-            //WARNING: java strikes again with only signed types.
-            String neighbourRID = (char) returnB[4] + "." +
-                    (char) returnB[5] + "." +
-                    (char) returnB[6] + "." +
-                    (char) returnB[7];
+            //RID in bytes 4,5,6,7 to string. Using IPAddress class to convert bytes to a string, easy peasy.
+            IPAddress pNeighbourRIDAddr = new IPAddressNetwork.IPAddressGenerator().from(
+                    Arrays.copyOfRange(packetBuffer, 4, 8)
+            );
+            String neighbourRID = pNeighbourRIDAddr.toString();
 
-            int neighbourPriority = Integer.parseUnsignedInt(returnB[31] + "");
-            IPAddress neighbourIP = new IPAddressNetwork.IPAddressGenerator().from(returnP.getAddress());
+            /* Try to match this packet to an existing neighbour. Existing neighbour just call reset on dead timer.
+             Nothing else then needs to be done.*/
+            NeighbourNode neighbour = NeighbourNode.GetNeighbourNodeByRID(neighbourRID);
+            if (neighbour != null) {
+                neighbour.ResetInactiveTimer();
+                continue;
+            }
+
+            //For a new neighbour, now convert priority from data and IP from packet header, create neighbour in table.
+
+            int neighbourPriority = Integer.parseUnsignedInt(pBytes[31] + "");
+            IPAddress neighbourIP = new IPAddressNetwork.IPAddressGenerator().from(pSource);
 
             NeighbourNode newNeighbour = new NeighbourNode(neighbourRID, neighbourPriority, neighbourIP);
-            System.out.println("Recieved packet from neighbour, with valid checksum. Neighbour ID: " +
-                    newNeighbour.GetRID());//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            System.out.println("Recieved packet from new neighbour, with valid checksum. Neighbour ID: " +
+                    newNeighbour.GetRID());
         }
+
+        /*
+         * TODO Read the neighbours' known neighbours from what was sent in hello packets
+         * TODO Figure out why known neighbour RID isn't send in the hello packet (likely missed in MakeHelloPacket()).
+         * TODO Modify behaviour of neighbour status, add 2way if current node is in the neighbours known neighbours list
+         * TODO Finish off tidying up code methods. Last: Launcher, Next: LSDB?
+         * TODO check implemented behaviour matches the design process flow
+         */
 
     }
 
@@ -186,7 +213,7 @@ public class StdDaemon {
                 0x00, 0x2c,//packet length
                 (byte) 0xc0, (byte) 0xa8, 0x01, 0x01,//source router rid (dotted decimal)
                 0x00, 0x00, 0x00, 0x00,//area id (dotted decimal)
-                0x20, (byte) 0xf2,//checksum
+                0x00, 0x00,//checksum
                 0x00, 0x00,//Auth type//0x00, 0x01
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,//Auth Data//0x63, 0x69, 0x73, 0x63, 0x6f, 0x00, 0x00, 0x00//"Cisco"
 
@@ -237,6 +264,7 @@ public class StdDaemon {
         lenBuffer.putInt(packetLength);
         ospfBuffer[2] = lenBuffer.array()[2];
         ospfBuffer[3] = lenBuffer.array()[3];//CHECK THAT RESULT IS IN BIG ENDIAN. ASSUME IT'S LIKELY IN LITTLE EDIAN.
+
 
         //Update Checksum (12, 13)
         ByteBuffer chkBuffer = ByteBuffer.allocate(8);
