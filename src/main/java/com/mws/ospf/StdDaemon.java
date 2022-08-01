@@ -2,15 +2,15 @@ package com.mws.ospf;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Shorts;
+import com.mws.ospf.pdt.ExternalStates;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressNetwork;
+import inet.ipaddr.IPAddressString;
 
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 public class StdDaemon {
 
@@ -52,7 +52,7 @@ public class StdDaemon {
 
         //End set hello socket
 
-        //Set recieve handler
+        //Set receive handler
 
 
         //Create a timer for hello and set it to run instantly. Running the timer schedules further running.
@@ -62,7 +62,7 @@ public class StdDaemon {
             public void run() {
                 SendHelloPacket();
             }
-        }, 0);
+        }, 0, 10 * 1000);
 
         threadHelloListen.start();
     }
@@ -84,24 +84,12 @@ public class StdDaemon {
         } catch (IOException ex) {
             DaemonErrorHandle("IOException when sending hello datagram packet", ex);
         }
-
-        //Schedule next run to execute the same method, based on the hello timer interval.
-        timerHelloSend.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                SendHelloPacket();
-            }
-        }, 10 * 1000);
     }
 
     public static void HelloReceiveThread() {
         //Buffer for raw data.
         byte[] pBytes = new byte[500];
         DatagramPacket pReturned = new DatagramPacket(pBytes, pBytes.length);
-
-        //TODO: Finish adding known neighbours. Next two lines for debug
-        Config.thisNode.knownNeighbours.add("");//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        Config.thisNode.GetKnownNeighboursString();//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
         //Only runs if not interrupted. If interrupted thread will end execution. To cancel, interrupt.
         while (!Thread.currentThread().isInterrupted()) {
@@ -112,27 +100,23 @@ public class StdDaemon {
                 DaemonErrorHandle("Exception on CheckHelloBuffer receive", ex);
             }
 
-
             //Get value used multiple times, source IP.
             InetAddress pSource = pReturned.getAddress();
 
+
+            //region VERIFY PACKET
             //Check this node was not the source
-            if (RouterInterface.GetInterfaceByIP(new IPAddressNetwork.IPAddressGenerator().from(pSource)) != null)
+            if (RouterInterface.GetInterfaceByIP(new IPAddressNetwork.IPAddressGenerator().from(pSource)) != null) {
                 continue;
-
-
-
-
+            }
 
             //verify single byte values, saves adv. processing if basic fields are wrong.
-
             //proto version (2)
             if (pBytes[0] != 0x02)
                 continue;
             //message type (hello)
             if (pBytes[1] != 0x01)
                 continue;
-
 
 
             //Setup new buffer to be of the specified length.
@@ -145,7 +129,7 @@ public class StdDaemon {
             byte[] packetBuffer = Arrays.copyOfRange(pBytes, 0, (pLength));
 
             //Get checksum. Bytes 12, 13
-            long pChecksum = Short.toUnsignedLong(Shorts.fromByteArray(Arrays.copyOfRange(pBytes,12, 14)));
+            long pChecksum = Short.toUnsignedLong(Shorts.fromByteArray(Arrays.copyOfRange(pBytes, 12, 14)));
 
             packetBuffer[12] = packetBuffer[13] = 0;//Unset checksum, so checksum calc will be correct.
 
@@ -155,43 +139,83 @@ public class StdDaemon {
                         Launcher.IpChecksum(packetBuffer));
                 continue;
             }
+            //endregion VERIFY PACKET
+            //int pLength
+            //byte[] packetBuffer
 
 
-
-
-
-            //Packet has been verified and is correct.
-
-            //RID in bytes 4,5,6,7 to string. Using IPAddress class to convert bytes to a string, easy peasy.
+            //region GATHER DATA
+            //RID in bytes 4,5,6,7 to string. Using IPAddress class to convert bytes to the RID, easy peasy.
             IPAddress pNeighbourRIDAddr = new IPAddressNetwork.IPAddressGenerator().from(
                     Arrays.copyOfRange(packetBuffer, 4, 8)
             );
-            String neighbourRID = pNeighbourRIDAddr.toString();
+            IPAddressString neighbourRID = pNeighbourRIDAddr.toAddressString();
 
-            /* Try to match this packet to an existing neighbour. Existing neighbour just call reset on dead timer.
-             Nothing else then needs to be done.*/
+            //Known neighbours RIDs.
+            List<IPAddressString> reportedKnownRIDs = new ArrayList<>();
+            if (pLength > 44) {
+                if ((pLength - 44) %4 != 0) {
+                    //Not allowed, number of bytes after should be a multiple of 4 bytes.
+                    System.err.println("Neighbour Node reported adjacent neighbours incorrectly");
+                    continue;
+                }
+
+                //Number of 4 byte pairs after the first 44 hello header bytes.
+                int knownNeighboursListLength = (pLength - 44) / 4;
+
+                //Loop through each 4 bytes after BDR RID, which are all recently known adjacent RIDs.
+                for (int i = 0; i < knownNeighboursListLength; i++) {
+                    int curByteOffset = 44 + (i*4);
+                    reportedKnownRIDs.add(new IPAddressNetwork.IPAddressGenerator().from(
+                            Arrays.copyOfRange(packetBuffer, curByteOffset, curByteOffset+4)
+                    ).toAddressString());
+                }
+            }
+            //endregion
+
+
+            //region USE DATA
             NeighbourNode neighbour = NeighbourNode.GetNeighbourNodeByRID(neighbourRID);
+
+            //If existing neighbour
             if (neighbour != null) {
+                neighbour.knownNeighbours = reportedKnownRIDs;//Update knowledge of neighbour nodes
+
+                //Set state correctly.
+                switch (neighbour.GetState()) {
+                    case DOWN -> neighbour.SetState(ExternalStates.INIT);
+                    case INIT -> {
+                        if (neighbour.knownNeighbours.contains(Config.thisNode.GetRID())) {
+                            neighbour.SetState(ExternalStates.TWOWAY);
+                            SendHelloPacket();
+                        }
+                    }//case INIT
+                }//switch (neighbour.state)
+
                 neighbour.ResetInactiveTimer();
                 continue;
             }
 
-            //For a new neighbour, now convert priority from data and IP from packet header, create neighbour in table.
-
+            //Neighbour doesn't exist:
+            //Convert priority from data and IP from packet header, create neighbour in table.
             int neighbourPriority = Integer.parseUnsignedInt(pBytes[31] + "");
             IPAddress neighbourIP = new IPAddressNetwork.IPAddressGenerator().from(pSource);
 
-            NeighbourNode newNeighbour = new NeighbourNode(neighbourRID, neighbourPriority, neighbourIP);
-            System.out.println("Recieved packet from new neighbour, with valid checksum. Neighbour ID: " +
-                    newNeighbour.GetRID());
+            neighbour = new NeighbourNode(neighbourRID, neighbourPriority, neighbourIP);
+            neighbour.knownNeighbours = reportedKnownRIDs;//Set initial knowledge of neighbour nodes
+
+            System.out.println("Received packet from new neighbour, with valid checksum. Neighbour ID: " +
+                    neighbour.GetRID());
+
+            Config.neighboursTable.add(neighbour);
+            Config.thisNode.knownNeighbours.add(neighbourRID);
+            SendHelloPacket();
+            //endregion
         }
 
         /*
-         * TODO Read the neighbours' known neighbours from what was sent in hello packets
-         * TODO Figure out why known neighbour RID isn't send in the hello packet (likely missed in MakeHelloPacket()).
-         * TODO Modify behaviour of neighbour status, add 2way if current node is in the neighbours known neighbours list
-         * TODO Finish off tidying up code methods. Last: Launcher, Next: LSDB?
-         * TODO check implemented behaviour matches the design process flow
+         * TODO Finish off tidying up code methods. Last: NeighbourNode, Next: Node?
+         * TODO check implemented behaviour matches the design process flow: Does SendHelloPacket get called when change from init->2way? from down->init?
          */
 
     }
@@ -245,9 +269,7 @@ public class StdDaemon {
         byte[] neighboursBuffer = new byte[Config.neighboursTable.size() * 4];
 
         int byteOffset = 0;
-        for (int i = 0; i < Config.neighboursTable.size(); i++)
-        {
-            Node neighbour = Config.neighboursTable.get(i);
+        for (NeighbourNode neighbour: Config.neighboursTable) {
             byte[] rID = neighbour.GetRIDBytes();
             neighboursBuffer[byteOffset] = rID[0];
             neighboursBuffer[byteOffset + 1] = rID[1];
@@ -263,7 +285,7 @@ public class StdDaemon {
         ByteBuffer lenBuffer = ByteBuffer.allocate(4);
         lenBuffer.putInt(packetLength);
         ospfBuffer[2] = lenBuffer.array()[2];
-        ospfBuffer[3] = lenBuffer.array()[3];//CHECK THAT RESULT IS IN BIG ENDIAN. ASSUME IT'S LIKELY IN LITTLE EDIAN.
+        ospfBuffer[3] = lenBuffer.array()[3];
 
 
         //Update Checksum (12, 13)

@@ -5,7 +5,6 @@ package com.mws.ospf;
  * the configuration class and creating a thread for the main process flow daemon being tested</p>
  */
 public class Launcher {
-
     //region STATIC PROPERTIES
     private final static String commandUsage =
             "Usage: java -jar ospf.jar [arguments] <Operation Mode Flag>" + System.lineSeparator() +

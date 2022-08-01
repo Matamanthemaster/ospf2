@@ -34,13 +34,12 @@ import java.util.List;
 * <p>Class to store the OSPF config file reference, and values in java data types.</p>
 */
 public class Config {
-
     //region STATIC PROPERTIES
     private static File fileConfig = null; //File reference, for IO Operations
     static boolean flagFileConfRemove;
     static ThisNode thisNode;//Accessible to all here.
-    static List<NeighbourNode> neighboursTable;
-    static LSDB lsdb;
+    static List<NeighbourNode> neighboursTable = new ArrayList<>();
+    static LSDB lsdb = new LSDB();
     //endregion
 
     //region STATIC METHODS
@@ -92,7 +91,7 @@ public class Config {
      */
     private static void MakeConfig() throws SocketException, UnknownHostException, AddressStringException {
 
-        List<RouterInterface> routerInterfaces = new ArrayList<>(Collections.emptyList());
+        List<RouterInterface> routerInterfaces = new ArrayList<>();
 
         //Loop over each network interface, building a default RouterInterface object
         Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
@@ -125,7 +124,7 @@ public class Config {
             ));
         }
 
-        thisNode = new ThisNode("0.0.0.1", "Router", routerInterfaces);
+        thisNode = new ThisNode(new IPAddressString("0.0.0.1"), "Router", routerInterfaces);
 
         WriteConfig();
         System.out.println("The config file has been made for the first time. Please change the config file at '" +
@@ -187,7 +186,8 @@ public class Config {
 
             //variables required to create ThisNode. RID is easy to make, Interfaces list is more complex, requiring
             // looping over XML elements.
-            String rid = configDocument.getElementsByTagName("RID").item(0).getTextContent();
+            IPAddressString rid = new IPAddressString(configDocument.getElementsByTagName("RID").item(0).getTextContent());
+
             List<RouterInterface> confInterfaces = new ArrayList<>();
 
             //Go into the interfaces element, loop over each child, getting all children of each interface and storing
@@ -237,10 +237,7 @@ public class Config {
                 confInterfaces.add(new RouterInterface(curIntName, curIntIPv4, curIntIPv6s, curIntType, curIntEnabled));
             }
             //Finally, take all the work we've done, create this node from rid and the interfaces in the config file.
-            //Also init tables.
             thisNode = new ThisNode(rid, hostname, confInterfaces);
-            neighboursTable = Collections.emptyList();
-            lsdb = new LSDB();
 
         } catch (ParserConfigurationException | SAXException | IOException | AddressStringException e) {
             e.printStackTrace();

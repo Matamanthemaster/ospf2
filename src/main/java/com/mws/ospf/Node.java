@@ -1,5 +1,7 @@
 package com.mws.ospf;
 
+import inet.ipaddr.IPAddressString;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,15 +9,12 @@ import java.util.List;
  * Base class for NeighbourNode and ThisNode. stores the common variables between both extend classes.
  */
 public abstract class Node {
-    /*
-     * OBJECT PROPERTIES
-     */
-    private String rID; //Router ID, a 32-bit integer represented in dotted decimal, identically to an IPv4 address.
-    public List<String> knownNeighbours = new ArrayList<>();
+    //region OBJECT PROPERTIES
+    private IPAddressString rID; //Router ID, a 32-bit integer represented in dotted decimal, identically to an IPv4 address.
+    List<IPAddressString> knownNeighbours = new ArrayList<>();
+    //endregion
 
-    /*
-     * OBJECT METHODS
-     */
+    //region OBJECT METHODS
     /**<p><h1>Node</h1></p>
      * <p>Construct a generic node with a specified rID that matches constraints of dotted decimal</p>
      * <p></p>
@@ -24,7 +23,7 @@ public abstract class Node {
      * @throws IllegalArgumentException rID provided is not a 4 character string or is equal to 0.0.0.0
      * @throws NumberFormatException rID provided cannot be parsed into a number (contains illegal characters)
      */
-    public Node(String rID) {
+    public Node(IPAddressString rID) {
         SetRID(rID);
     }
 
@@ -36,25 +35,18 @@ public abstract class Node {
      * @throws IllegalArgumentException rID provided is not a 4 character string or is equal to 0.0.0.0
      * @throws NumberFormatException rID provided cannot be parsed into a number (contains illegal characters)
      */
-    public void SetRID(String rID) {
-        String[] rIDByte = rID.split("\\.");
-        if (rIDByte.length != 4)
-            throw new IllegalArgumentException("rID provided must have 4 octets (e.g. 0.0.0.1)");
+    public void SetRID(IPAddressString rID) {
+        if (!rID.isValid())
+            throw new IllegalArgumentException("RID isn't valid");
+        if (!rID.isIPv4())
+            throw new IllegalArgumentException("RID must be IPv4");
+        if (rID.isEmpty())
+            throw new IllegalArgumentException("RID cannot be an empty IPAddressString");
+        if (rID.isPrefixed())
+            throw new IllegalArgumentException("RID should not be a prefix string");
+        if (rID.isZero())
+            throw new IllegalArgumentException("RID cannot be 0.0.0.0");
 
-        //Look for alpha characters, and check rID is not 0.0.0.0
-        try {
-            int zeroByteCount = 0;
-            for (int i = 0; i < 4; i++)
-            {
-                if (Integer.parseInt(rIDByte[i]) == 0)
-                    zeroByteCount++;
-            }
-            if (zeroByteCount == 4)
-                throw new IllegalArgumentException("rID provided cannot be 0.0.0.0");
-
-        } catch (NumberFormatException ex) {
-            throw new NumberFormatException("rID provided is not a number");
-        }
         this.rID = rID;
     }
 
@@ -62,18 +54,21 @@ public abstract class Node {
      * <p>Return the Router ID as stored string</p>
      * @return The node's router ID
      */
-    public String GetRID() {
+    public IPAddressString GetRID() {
         return this.rID;
     }
 
+    /**<p><h1>Get Known Neighbours String</h1></p>
+     * <p>Returns a list of known neighbours as a comma separated string list</p>
+     * @return List of known neighbours, as comma separated list.
+     */
     public String GetKnownNeighboursString() {
         String neighbours = "";
-        for (String neighbour: knownNeighbours)
+        for (IPAddressString neighbour: knownNeighbours)
         {
-            neighbours += neighbour + ",";
+            neighbours += neighbour.toString() + ",";
         }
         neighbours = neighbours.substring(0, neighbours.length()-1);
-        System.out.println(neighbours);
         return neighbours;
     }
 
@@ -83,12 +78,7 @@ public abstract class Node {
      * @throws NumberFormatException if the node rID is not a number.
      */
     public byte[] GetRIDBytes() {
-        byte[] rIDB = new byte[4];
-        String rIDS = this.rID.replaceAll("\\.", "");
-        for (int i = 0; i < 4; i++)
-        {
-            rIDB[i] = (byte) Integer.parseInt(String.valueOf(rIDS.charAt(i)));
-        }
-        return rIDB;
+        return rID.getAddress().getBytes();
     }
+    //endregion
 }
