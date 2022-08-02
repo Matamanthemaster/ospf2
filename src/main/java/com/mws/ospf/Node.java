@@ -5,8 +5,9 @@ import inet.ipaddr.IPAddressString;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Base class for NeighbourNode and ThisNode. stores the common variables between both extend classes.
+/**<p><h1>Node</h1></p>
+ * <p>Base class for NeighbourNode and ThisNode. stores the common variables between both extend classes. Basic node
+ * constraints are defined in this class.</p>
  */
 public abstract class Node {
     //region OBJECT PROPERTIES

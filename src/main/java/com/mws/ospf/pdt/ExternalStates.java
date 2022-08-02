@@ -1,9 +1,8 @@
 package com.mws.ospf.pdt;
 
-/**
- * A state of either a neighbour node or network state. Not all are applicable to both. They are transmitted in EH-I
- * packets, as part of a byte, 3 bits of which are ever specified, to match the 8 states. The next 3 bits are reserved,
- * and two bits used as flags.
+/**<p><h1>External States</h1></p>
+ * <p>The state of a neighbour node. Based on OSPF states, used in protocol process flow. Each state has an associated
+ * value</p>
  */
 public enum ExternalStates {
     DOWN(0),
@@ -16,6 +15,9 @@ public enum ExternalStates {
 
     public byte value;
 
+    /**<p><h1>Map ExternalState enum to value</h1></p>
+     * @param value value of a state, to be translated to one byte
+     */
     ExternalStates(int value) {
         this.value = (byte) value;
     }

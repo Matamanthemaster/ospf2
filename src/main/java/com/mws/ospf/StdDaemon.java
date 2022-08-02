@@ -12,17 +12,30 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+/**<p><h1>Standard Daemon</h1></p>
+ * <p>The standard OSPF daemon process. Forms and manages standard OSPF process flow, following the OSPFv2 RFC.
+ * Methods provided can be used in the encrypted daemon, such as MakeHelloPacket and DaemonErrorHandle.</p>
+ * <p></p>
+ * <p>Very code heavy class.</p>
+ */
 public class StdDaemon {
-
+    //region STATIC PROPERTIES
     private static MulticastSocket socketHello;
     private static InetSocketAddress socAddrHello;
     private static Timer timerHelloSend;
 
     //Setup thread for hello multicast server
     private static Thread threadHelloListen = new Thread(StdDaemon::HelloReceiveThread, "Thread-Hello-Receive");
+    //endregion
 
+    //region STATIC METHODS
+    /**<p><h1>StdDaemon Main Method</h1></p>
+     * <p>Entrypoint into the StdDaemon. Sets up the hello protocol behaviour to allow nodes to start working with
+     * implemented methods to handle communication. Init the normal process flow of OSPF.</p>
+     */
     static void Main() {
-        //Set helloSocket, used for multicasting. Binds the ospf multicast address to all interfaces using this socket.
+        //region SET HELLOSOCKET
+        //used for multicasting. Binds the ospf multicast address to all interfaces using this socket.
         socketHello = null;
         try {
             socAddrHello = new InetSocketAddress(InetAddress.getByName("224.0.0.5"), 25565);
@@ -49,12 +62,9 @@ public class StdDaemon {
         //If helloSocket was not correctly set and no exception was gotten, hard exit
         if (socketHello == null)
             DaemonErrorHandle("", null);
+        //endregion SET HELLOSOCKET
 
-        //End set hello socket
-
-        //Set receive handler
-
-
+        //region SET RECEIVE HANDLER
         //Create a timer for hello and set it to run instantly. Running the timer schedules further running.
         timerHelloSend = new Timer();
         timerHelloSend.schedule(new TimerTask() {
@@ -65,9 +75,15 @@ public class StdDaemon {
         }, 0, 10 * 1000);
 
         threadHelloListen.start();
+        //endregion
     }
 
-    public static void SendHelloPacket() {
+    /**<p><h1>Send a Hello Packet</h1></p>
+     * <p>Method used to send a hello packet. Uses the method MakeHelloPacket for the packet buffer, using  socketHello
+     * multicast socket to send to each RouterInterface.</p>
+     * <p>Can be called individually to send a packet. Also is the TimerTask that executes on timerHelloSend tick</p>
+     */
+    private static void SendHelloPacket() {
         //Make buffer
         byte[] helloBuffer = MakeHelloPacket();
 
@@ -86,7 +102,13 @@ public class StdDaemon {
         }
     }
 
-    public static void HelloReceiveThread() {
+    /**<p><h1>Hello Packet Receive Method</h1></p>
+     * <p>Method implemented as a thread to receive a hello packet from any network joined to the multicast group.
+     * Thread is required as the receive method is blocking.</p>
+     * <p>Once a packet is received, it is verified, data is scraped from it, and then the data is used in protocol
+     * functions and stored in Config.</p>
+     */
+    private static void HelloReceiveThread() {
         //Buffer for raw data.
         byte[] pBytes = new byte[500];
         DatagramPacket pReturned = new DatagramPacket(pBytes, pBytes.length);
@@ -102,7 +124,6 @@ public class StdDaemon {
 
             //Get value used multiple times, source IP.
             InetAddress pSource = pReturned.getAddress();
-
 
             //region VERIFY PACKET
             //Check this node was not the source
@@ -143,7 +164,6 @@ public class StdDaemon {
             //int pLength
             //byte[] packetBuffer
 
-
             //region GATHER DATA
             //RID in bytes 4,5,6,7 to string. Using IPAddress class to convert bytes to the RID, easy peasy.
             IPAddress pNeighbourRIDAddr = new IPAddressNetwork.IPAddressGenerator().from(
@@ -171,8 +191,7 @@ public class StdDaemon {
                     ).toAddressString());
                 }
             }
-            //endregion
-
+            //endregion GATHER DATA
 
             //region USE DATA
             NeighbourNode neighbour = NeighbourNode.GetNeighbourNodeByRID(neighbourRID);
@@ -210,7 +229,7 @@ public class StdDaemon {
             Config.neighboursTable.add(neighbour);
             Config.thisNode.knownNeighbours.add(neighbourRID);
             SendHelloPacket();
-            //endregion
+            //endregion USE DATA
         }
 
         /*
@@ -228,7 +247,7 @@ public class StdDaemon {
      * <p>The RIDs of neighbours are derived from Config.neighboursTable. The router IDs from each NeighbourNode.rID</p>
      * @return the completed hello packet in bytes.
      */
-    public static byte[] MakeHelloPacket() {
+    static byte[] MakeHelloPacket() {
         //Generic buffer that will be updated with specific values.
         byte[] ospfBuffer = {
                 //GENERIC OSPF HEADER
@@ -303,7 +322,7 @@ public class StdDaemon {
      * @param message A message to print to the user
      * @param ex an exception passed from an exception handler. Can be null.
      */
-    private static void DaemonErrorHandle(String message, Exception ex) {
+    static void DaemonErrorHandle(String message, Exception ex) {
         //Message handle
         if (ex != null) {
             System.out.println("Exception in daemon process: " + message + ": \nStack trace follows:\n");
@@ -318,4 +337,5 @@ public class StdDaemon {
         socketHello.close();
         System.exit(-2);
     }
+    //endregion
 }

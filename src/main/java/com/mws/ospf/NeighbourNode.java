@@ -81,7 +81,7 @@ public class NeighbourNode extends Node {
             timerInactivity.cancel();
         }
 
-        timerInactivity = new Timer(this.GetRID() + "-ResetTimer");
+        timerInactivity = new Timer(this.GetRID() + "-DeadTimer");
         timerInactivity.schedule(new TimerTask() {
             @Override
             public void run() {

@@ -1,53 +1,56 @@
 package com.mws.ospf.pdt;
 
 
-/**
- * An enumerable list of common interface types. Can be used to derive interface information
+/**<p><h1>Interface Types</h1></p>
+ * <p>An enumerable list of common interface types. Can be used to derive interface information</p>
  */
 public enum InterfaceType {
-    /**
-     * A T1 serial interface operating at 1.544Mbps.
-     * BW: 1.544Mbps
+    /**<p><h1>T1</h1></p>
+     * <p>A T1 serial interface operating at 1.544Mbps.</p>
+     * <p><b>BW: 1.544Mbps</b></p>
      */
     T1(1544000L),
-    /**
-     * An E1 serial interface operating at 2.048Mbps
-     * BW: 2.048Mbps
+    /**<p><h1>E1</h1></p>
+     * <p>An E1 serial interface operating at 2.048Mbps</p>
+     * <p><b>BW: 2.048Mbps</b></p>
      */
     E1(2048000L),
-    /**
-     * A 10Base-T interface. Ethernet running at 10Mbps
-     * BW: 10Mbps
+    /**<p><h1>10Base-T</h1></p>
+     * <p>A 10Base-T interface. Ethernet running at 10Mbps</p>
+     * <p><b>BW: 10Mbps</b></p>
      */
     E10BASET(10000000L),
-    /**
-     * A 100Base-T interface. Ethernet running at 100Mbps
-     * BW: 100Mbps
+    /**<p><h1>100Base-T</h1></p>
+     * <p>A 100Base-T interface. Ethernet running at 100Mbps</p>
+     * <p><b>BW: 100Mbps</b></p>
      */
     E100BASET(100000000L),
-    /**
-     * A 1000Base-T interface. Ethernet running at 1Gbps
-     * BW: 1Gbps
+    /**<p><h1>1000Base-T</h1></p>
+     * <p>A 1000Base-T interface. Ethernet running at 1Gbps</p>
+     * <p><b>BW: 1Gbps</b></p>
      */
     E1000BASET(1000000000L),
-    /**
-     * A 2.5GBase-T interface. Ethernet running at 2.5Gbps
-     * BW: 2.5Gbps
+    /**<p><h1>2.5GBase-T</h1></p>
+     * <p>A 2.5GBase-T interface. Ethernet running at 2.5Gbps</p>
+     * <p><b>BW: 2.5Gbps</b></p>
      */
     E2_5GBASET(2500000000L),
-    /**
-     * A 5GBase-T interface. Ethernet running at 5Gbps
-     * BW: 5Gbps
+    /**<p><h1>5GBase-T</h1></p>
+     * <p>A 5GBase-T interface. Ethernet running at 5Gbps</p>
+     * <p><b>BW: 5Gbps</b></p>
      */
     E5GBASET(5000000000L),
-    /**
-     * A 10GBase-T interface. Ethernet running at 10Gbps
-     * BW: 10Gbps
+    /**<p><h1>10GBase-T</h1></p>
+     * <p>A 10GBase-T interface. Ethernet running at 10Gbps</p>
+     * <p><b>BW: 10Gbps</b></p>
      */
     E10GBASET(10000000000L);
 
-    /**
-     * Constructor for enum InterfaceType for mapping each enum to a bandwidth value
+    //Internal storage for the raw bandwidth value
+    private final long bandwidth;
+
+    /**<p><h1>Interface Type Constructor</h1></p>
+     * <p>Constructor for enum InterfaceType for mapping each enum to a bandwidth value</p>
      * @param bandwidth the standard bandwidth, in bits per second, of an interface type
      */
     InterfaceType(long bandwidth)
@@ -55,25 +58,21 @@ public enum InterfaceType {
         this.bandwidth = bandwidth;
     }
 
-    //Internal storage for the raw bandwidth value
-    private final long bandwidth;
-
-    /**
-     * Get the bandwidth associated with a specific enum of InterfaceType
+    /**<p><h1>Get Bandwidth</h1></p>
+     * <p>Get the bandwidth associated with a specific enum of InterfaceType</p>
      * @return Interface Bandwidth
      */
-    public long getBandwidth()
+    public long GetBandwidth()
     {
         return this.bandwidth;
     }
 
-    /**
-     * Convert enum type to string, based on the specific enum. Useful for storage in a file.
+    /**<p><h1>Convert ENUM to String</h1></p>
+     * <p>Convert enum type to string, based on the specific enum. Useful for storage in a file.</p>
      * @return a text string that represents the string value.
      */
     @Override
-   public String toString()
-   {
+    public String toString() {
        switch (this)
        {
            case T1 -> {
@@ -104,8 +103,14 @@ public enum InterfaceType {
        }
    }
 
-    public static InterfaceType fromString(String type)
-    {
+
+    /**<p><h1>From String</h1></p>
+     * <p>Map of a string value to an interface type ENUM. Values identical to that returned by toString()</p>
+     * @param type String value to map to an InterfaceType ENUM
+     * @return the associated ENUM InterfaceType
+     * @throws IllegalArgumentException parameter type is not valid
+     */
+    public static InterfaceType fromString(String type) {
         switch (type)
         {
             case "T1" -> {
@@ -132,7 +137,7 @@ public enum InterfaceType {
             case "10GBase-T" -> {
                 return InterfaceType.E10GBASET;
             }
-            default -> throw new IllegalStateException("Unexpected value: " + type);
+            default -> throw new IllegalArgumentException("Unexpected value: " + type);
         }
     }
 }

@@ -288,7 +288,7 @@ public class Config {
             for (RouterInterface curRInt: thisNode.interfaceList)
             {
                 //Current interface element (e.g. <enp5s0></enp5s0>)
-                Element confCurRInt = _GetConfigElementFromRoot(confDoc, confInterfacesRoot, curRInt.getName());
+                Element confCurRInt = _GetConfigElementFromRoot(confDoc, confInterfacesRoot, curRInt.GetName());
 
                 //IPv4 Address (e.g. 192.168.1.20/24)
                 Element confCurRIntIPv4 = _GetConfigElementFromRoot(confDoc, confCurRInt, "IPv4");
