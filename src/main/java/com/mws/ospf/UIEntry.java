@@ -20,5 +20,6 @@ public class UIEntry extends Application {
         primaryStage.setTitle("");
         primaryStage.setScene(scene);
         primaryStage.show();
+        primaryStage.setOnCloseRequest(UIController::OnClose);
     }
 }

@@ -17,7 +17,7 @@ import java.util.List;
  */
 public class RouterInterface {
     //region STATIC PROPERTIES
-    private static List<RouterInterface> _RouterInterfaces = new ArrayList<>();
+    private static final List<RouterInterface> _RouterInterfaces = new ArrayList<>();
     //endregion
 
     //region STATIC METHODS
@@ -28,9 +28,25 @@ public class RouterInterface {
      * @return First RouterInterface associated with the IP, or null
      */
     public static RouterInterface GetInterfaceByIP(IPAddress ip) {
-        for(RouterInterface r: _RouterInterfaces)
-        {
-            if (r.addrIPv4.toInetAddress().equals(ip.toInetAddress())) {
+        for(RouterInterface r: _RouterInterfaces) {
+            if (r.addrIPv4.toIPv4().equals(ip.toIPv4()))
+                return r;
+        }
+        return null;
+    }
+
+    /**<p><h1>Get Interface Object by Network Address</h1></p>
+     * <p>Searches the internal list of all created Router Interfaces for a specific interface that shares the same
+     * network address. Network addresses is a host address zeroed after CIDR prefix length. Returned interface will
+     * only be an interface that shares the same network address as the specified interface.</p>
+     * <p>The provided ip address' prefix length is not taken into account, only the CIDR prefix of the checking
+     * interface.</p>
+     * @param ip ip address to check against all interfaces for a match in network address
+     * @return a router interface object that shares the same network address as ip
+     */
+    public static RouterInterface GetInterfaceByIPNetwork(IPAddress ip) {
+        for (RouterInterface r: _RouterInterfaces) {
+            if (r.isAddressInNetwork(ip)) {
                 return r;
             }
         }
@@ -90,6 +106,17 @@ public class RouterInterface {
      */
     public NetworkInterface ToNetworkInterface() throws SocketException {
         return NetworkInterface.getByName(this.name);
+    }
+
+    /**<p><h1>Is Address in Network</h1></p>
+     * <p>Returns whether provided IP is within the network address range of the current interface. That is, if the
+     * provided IP uses the same prefix length mask as the current interfaces IPv4, they are in the same network.</p>
+     * @param ip ip to check against the current interface's addrIPv4
+     * @return true if the network addresses match
+     */
+    public boolean isAddressInNetwork(IPAddress ip) {
+        ip = ip.setPrefixLength(addrIPv4.getNetworkPrefixLength());
+        return addrIPv4.toZeroHost().equals(ip.toZeroHost());
     }
 
     /**<p><h1>Print Properties Test</h1></p>

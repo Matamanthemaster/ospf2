@@ -11,7 +11,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -120,7 +119,7 @@ public class Config {
                     ipv4Addr,
                     ipv6Addrs,
                     InterfaceType.E1,
-                    networkInterface.isUp()
+                    false
             ));
         }
 
@@ -252,17 +251,15 @@ public class Config {
      */
     static void WriteConfig() {
         try {
-            if (!ConfigExists())
+            if (ConfigExists()) {
+                fileConfig.delete();
                 fileConfig.createNewFile();
+            }
 
             //Recreate config document.
             DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-            Document confDoc;
-            try {
-                confDoc = builder.parse(fileConfig);
-            } catch (SAXParseException ex) {
-                confDoc = builder.newDocument();
-            }
+            Document confDoc = builder.newDocument();
+
 
 
             //Setup document root
@@ -297,9 +294,10 @@ public class Config {
                 //IPv6 Address. First remove all existing elements, then recreate elements. This is the simplest way.
                 //(E.g. <IPv6>fe80::9656:d028:8652:66b6/64</IPv6>
                 //      <IPv6>2001:db8:acad::1/96</IPv6>
-                for (int i = 0; i < confCurRInt.getElementsByTagName("IPv6").getLength(); i++)
+                NodeList ip6Tags = confCurRInt.getElementsByTagName("IPv6");
+                for (int i = 0; i < ip6Tags.getLength(); i++)
                 {
-                    confCurRInt.removeChild(confInterfacesRoot.getElementsByTagName("IPv6").item(i));
+                    confCurRInt.removeChild(ip6Tags.item(i));
                 }
                 for (IPAddress curIPv6: curRInt.addrIPv6)
                 {
@@ -323,7 +321,7 @@ public class Config {
             transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, "yes");
             transformer.transform(new DOMSource(confDoc), new StreamResult(fileConfig));
 
-        } catch (ParserConfigurationException | IOException | SAXException | TransformerException e) {
+        } catch (ParserConfigurationException | IOException | TransformerException e) {
             e.printStackTrace();
             ConfigErrorHandle("Exception when creating the XML document in Config.WriteConfig(). See the stack trace above");
         }

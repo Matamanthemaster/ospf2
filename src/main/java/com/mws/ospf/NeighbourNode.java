@@ -3,6 +3,7 @@ package com.mws.ospf;
 import com.mws.ospf.pdt.ExternalStates;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
+import javafx.scene.control.Tab;
 
 import java.net.DatagramSocket;
 import java.util.Timer;
@@ -50,6 +51,8 @@ public class NeighbourNode extends Node {
 
     //Variable used for unicast datagram communication with this specific neighbour. Used in DBD packet and SLR/U
     public DatagramSocket unicastSocket;
+    public final RouterInterface rIntOwner;
+    public Tab tab;
     //endregion
 
     //region OBJECT METHODS
@@ -65,6 +68,7 @@ public class NeighbourNode extends Node {
         super(rID);
         this.priority = priority;
         this.ipAddress = ipAddress;
+        this.rIntOwner = RouterInterface.GetInterfaceByIPNetwork(ipAddress);
 
         //Neighbour just added to neighbours, init state.
         SetState(ExternalStates.INIT);

@@ -25,7 +25,7 @@ public class StdDaemon {
     private static Timer timerHelloSend;
 
     //Setup thread for hello multicast server
-    private static Thread threadHelloListen = new Thread(StdDaemon::HelloReceiveThread, "Thread-Hello-Receive");
+    private static final Thread threadHelloListen = new Thread(StdDaemon::HelloReceiveThread, "Thread-Hello-Receive");
     //endregion
 
     //region STATIC METHODS
@@ -70,7 +70,7 @@ public class StdDaemon {
         timerHelloSend.schedule(new TimerTask() {
             @Override
             public void run() {
-                SendHelloPacket();
+                SendHelloPacket(null);
             }
         }, 0, 10 * 1000);
 
@@ -82,15 +82,34 @@ public class StdDaemon {
      * <p>Method used to send a hello packet. Uses the method MakeHelloPacket for the packet buffer, using  socketHello
      * multicast socket to send to each RouterInterface.</p>
      * <p>Can be called individually to send a packet. Also is the TimerTask that executes on timerHelloSend tick</p>
+     * <p>sendInterface can be specified to limit the hello packet send to a specific interface, for the purpose of
+     * forcing an adjacency to form quicker, by sending a more up-to-date hello packet, and hopefully receiving one.</p>
+     * @param sendInterface A specific interface to send to. Either null or a RouterInterface
      */
-    private static void SendHelloPacket() {
+    private static void SendHelloPacket(RouterInterface sendInterface) {
+
         //Make buffer
         byte[] helloBuffer = MakeHelloPacket();
 
         //Create a datagram packet to send, send it out all network interfaces.
         try {
             DatagramPacket helloPacket = new DatagramPacket(helloBuffer, helloBuffer.length, socAddrHello);
+
+            //sendInterface is specified, only send hello on the specified interface.
+            if (sendInterface != null) {
+                if (!sendInterface.isEnabled)
+                    DaemonErrorHandle("SendHelloPacket: sendInterface specified is disabled.", null);
+
+                socketHello.setNetworkInterface(sendInterface.ToNetworkInterface());
+                socketHello.send(helloPacket);
+                return;
+            }
+
+            //sendInterface is null, send packet to all enabled interfaces.
             for (RouterInterface rInt: Config.thisNode.interfaceList) {
+                if (!rInt.isEnabled)
+                    continue;
+
                 socketHello.setNetworkInterface(rInt.ToNetworkInterface());
                 socketHello.send(helloPacket);
             }
@@ -123,12 +142,19 @@ public class StdDaemon {
             }
 
             //Get value used multiple times, source IP.
-            InetAddress pSource = pReturned.getAddress();
+            IPAddress pSource = new IPAddressNetwork.IPAddressGenerator().from(pReturned.getAddress());
 
             //region VERIFY PACKET
-            //Check this node was not the source
-            if (RouterInterface.GetInterfaceByIP(new IPAddressNetwork.IPAddressGenerator().from(pSource)) != null) {
+            //Check this node was not the source, and interface is enabled.
+            if (RouterInterface.GetInterfaceByIP(pSource) != null)
                 continue;
+            try {
+                if (!RouterInterface.GetInterfaceByIPNetwork(pSource).isEnabled)
+                    continue;
+            } catch (NullPointerException ex) {
+              DaemonErrorHandle("HelloReceiveThread: Hello packet received on interface not in RouterInterface." +
+                      " This should not happen, as socketHello shouldn't be joined to an interface that has not been" +
+                      " created, and sho a hello packet should not have been received.", ex);
             }
 
             //verify single byte values, saves adv. processing if basic fields are wrong.
@@ -194,19 +220,27 @@ public class StdDaemon {
             //endregion GATHER DATA
 
             //region USE DATA
+
+            /*For existing neighbour node in the neighbours table, determine based on state what event has been received.
+            On Down, this is Down->Init HelloReceived event. On Init, if the neighbour is in the neighbours table, this
+            is a 2-WayReceived event.*/
             NeighbourNode neighbour = NeighbourNode.GetNeighbourNodeByRID(neighbourRID);
 
-            //If existing neighbour
             if (neighbour != null) {
                 neighbour.knownNeighbours = reportedKnownRIDs;//Update knowledge of neighbour nodes
 
                 //Set state correctly.
                 switch (neighbour.GetState()) {
-                    case DOWN -> neighbour.SetState(ExternalStates.INIT);
+                    case DOWN -> neighbour.SetState(ExternalStates.INIT);//Down state if neighbour expired already.
                     case INIT -> {
                         if (neighbour.knownNeighbours.contains(Config.thisNode.GetRID())) {
-                            neighbour.SetState(ExternalStates.TWOWAY);
-                            SendHelloPacket();
+                            neighbour.SetState(ExternalStates.EXSTART);
+
+                            /*OSPF event "2-WayReceived", on p2p network, set to ExStart state, and begin exchange
+                            process. On Event 2-WayReceived, it isn't specified that OSPF should send a new packet to
+                            the neighbour node, but this is intended to force event 2-WayReceived on the neighbour
+                            node, so it doesn't have to wait for the hello timer to fire*/
+                            SendHelloPacket(neighbour.rIntOwner);
                         }
                     }//case INIT
                 }//switch (neighbour.state)
@@ -216,11 +250,10 @@ public class StdDaemon {
             }
 
             //Neighbour doesn't exist:
-            //Convert priority from data and IP from packet header, create neighbour in table.
+            //Convert priority from data, use IP from packet header and RID from packet, create neighbour in table.
             int neighbourPriority = Integer.parseUnsignedInt(pBytes[31] + "");
-            IPAddress neighbourIP = new IPAddressNetwork.IPAddressGenerator().from(pSource);
 
-            neighbour = new NeighbourNode(neighbourRID, neighbourPriority, neighbourIP);
+            neighbour = new NeighbourNode(neighbourRID, neighbourPriority, pSource);
             neighbour.knownNeighbours = reportedKnownRIDs;//Set initial knowledge of neighbour nodes
 
             System.out.println("Received packet from new neighbour, with valid checksum. Neighbour ID: " +
@@ -228,15 +261,12 @@ public class StdDaemon {
 
             Config.neighboursTable.add(neighbour);
             Config.thisNode.knownNeighbours.add(neighbourRID);
-            SendHelloPacket();
+
+            /*Not in OSPF spec to send a hello packet on Down -> Init state, but allows quicker convergence, not waiting
+            //for hello timer to expire*/
+            SendHelloPacket(neighbour.rIntOwner);
             //endregion USE DATA
         }
-
-        /*
-         * TODO Finish off tidying up code methods. Last: NeighbourNode, Next: Node?
-         * TODO check implemented behaviour matches the design process flow: Does SendHelloPacket get called when change from init->2way? from down->init?
-         */
-
     }
 
     /**<p><h1>Make Hello Packet</h1></p>
@@ -261,7 +291,7 @@ public class StdDaemon {
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,//Auth Data//0x63, 0x69, 0x73, 0x63, 0x6f, 0x00, 0x00, 0x00//"Cisco"
 
                 //OSPF HELLO PACKET HEADER
-                (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0x00,//Network Mask
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,//Network Mask, p2p networks equal to 0.0.0.0.
                 0x00, 0x0a,//hello interval//10
                 0x00,//options
                 0x01,//router priority
