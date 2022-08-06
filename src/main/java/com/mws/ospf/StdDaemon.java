@@ -273,8 +273,8 @@ public class StdDaemon {
      * <p>From a generic byte buffer (treated as unsigned), return a hello packet. The packet includes corrected values
      * based on this node's RID, neighbours RIDs, updating the length and internet checksum.</p>
      * <p></p>
-     * <p>This node's RID is derived from Config.thisNode.rID</p>
-     * <p>The RIDs of neighbours are derived from Config.neighboursTable. The router IDs from each NeighbourNode.rID</p>
+     * <p>This node's rid is derived from Config.thisNode.rid</p>
+     * <p>The RIDs of neighbours are derived from Config.neighboursTable. The router IDs from each NeighbourNode.rid</p>
      * @return the completed hello packet in bytes.
      */
     static byte[] MakeHelloPacket() {
@@ -302,11 +302,11 @@ public class StdDaemon {
 
         //Update router ID (4, 5, 6, 7)
         try {
-            byte[] rID = Config.thisNode.GetRIDBytes();
-            ospfBuffer[4] = rID[0];
-            ospfBuffer[5] = rID[1];
-            ospfBuffer[6] = rID[2];
-            ospfBuffer[7] = rID[3];
+            byte[] rid = Config.thisNode.GetRIDBytes();
+            ospfBuffer[4] = rid[0];
+            ospfBuffer[5] = rid[1];
+            ospfBuffer[6] = rid[2];
+            ospfBuffer[7] = rid[3];
         } catch (Exception ex)  {
             DaemonErrorHandle("Error when creating an OSPF packet: Substituting in router ID.", ex);
         }
@@ -319,11 +319,11 @@ public class StdDaemon {
 
         int byteOffset = 0;
         for (NeighbourNode neighbour: Config.neighboursTable) {
-            byte[] rID = neighbour.GetRIDBytes();
-            neighboursBuffer[byteOffset] = rID[0];
-            neighboursBuffer[byteOffset + 1] = rID[1];
-            neighboursBuffer[byteOffset + 2] = rID[2];
-            neighboursBuffer[byteOffset + 3] = rID[3];
+            byte[] rid = neighbour.GetRIDBytes();
+            neighboursBuffer[byteOffset] = rid[0];
+            neighboursBuffer[byteOffset + 1] = rid[1];
+            neighboursBuffer[byteOffset + 2] = rid[2];
+            neighboursBuffer[byteOffset + 3] = rid[3];
 
             byteOffset += 4;
         }

@@ -44,7 +44,7 @@ public class NeighbourNode extends Node {
 
     //region OBJECT PROPERTIES
     private ExternalStates state = ExternalStates.DOWN;
-    public Timer timerInactivity;
+    Timer timerInactivity;
     private boolean flagTimerInactRunning = false;
     public int priority;
     public IPAddress ipAddress;
@@ -60,12 +60,12 @@ public class NeighbourNode extends Node {
      * <p>Create an instance of Neighbour Node with provided parameters. Used to store information about a specific
      * neighbour.</p>
      * <p>Will also add the neighbour to a list of all neighbour nodes, for easy searching</p>
-     * @param rID the neighbour's advertised router ID
+     * @param rid the neighbour's advertised router ID
      * @param priority the neighbour's advertised priority (MA election)
      * @param ipAddress the neighbour's interface IP address, for unicast messaging
      */
-    public NeighbourNode(IPAddressString rID, int priority, IPAddress ipAddress) {
-        super(rID);
+    public NeighbourNode(IPAddressString rid, int priority, IPAddress ipAddress) {
+        super(rid);
         this.priority = priority;
         this.ipAddress = ipAddress;
         this.rIntOwner = RouterInterface.GetInterfaceByIPNetwork(ipAddress);

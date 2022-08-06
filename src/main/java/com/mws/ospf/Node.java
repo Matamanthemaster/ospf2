@@ -11,44 +11,44 @@ import java.util.List;
  */
 public abstract class Node {
     //region OBJECT PROPERTIES
-    private IPAddressString rID; //Router ID, a 32-bit integer represented in dotted decimal, identically to an IPv4 address.
+    private IPAddressString rid; //Router ID, a 32-bit integer represented in dotted decimal, identically to an IPv4 address.
     List<IPAddressString> knownNeighbours = new ArrayList<>();
     //endregion
 
     //region OBJECT METHODS
     /**<p><h1>Node</h1></p>
-     * <p>Construct a generic node with a specified rID that matches constraints of dotted decimal</p>
+     * <p>Construct a generic node with a specified rid that matches constraints of dotted decimal</p>
      * <p></p>
      * <p>e.g. 0.0.0.1, 1.1.1.1, 200.200.200.200</p>
-     * @param rID Router ID, 4 byte dotted decimal string, cannot be 0.0.0.0
-     * @throws IllegalArgumentException rID provided is not a 4 character string or is equal to 0.0.0.0
-     * @throws NumberFormatException rID provided cannot be parsed into a number (contains illegal characters)
+     * @param rid Router ID, 4 byte dotted decimal string, cannot be 0.0.0.0
+     * @throws IllegalArgumentException rid provided is not a 4 character string or is equal to 0.0.0.0
+     * @throws NumberFormatException rid provided cannot be parsed into a number (contains illegal characters)
      */
-    public Node(IPAddressString rID) {
-        SetRID(rID);
+    public Node(IPAddressString rid) {
+        SetRID(rid);
     }
 
     /**<p><h1>Set Router ID</h1></p>
      * <p>Set Router ID from a 4 byte dotted decimal string. Cannot be 0.0.0.0.</p>
      * <p></p>
      * <p>e.g. 0.0.0.1, 1.1.1.1, 200.200.200.200</p>
-     * @param rID Router ID, 4 byte dotted decimal string, cannot be 0.0.0.0
-     * @throws IllegalArgumentException rID provided is not a 4 character string or is equal to 0.0.0.0
-     * @throws NumberFormatException rID provided cannot be parsed into a number (contains illegal characters)
+     * @param rid Router ID, 4 byte dotted decimal string, cannot be 0.0.0.0
+     * @throws IllegalArgumentException rid provided is not a 4 character string or is equal to 0.0.0.0
+     * @throws NumberFormatException rid provided cannot be parsed into a number (contains illegal characters)
      */
-    public void SetRID(IPAddressString rID) {
-        if (!rID.isValid())
+    public void SetRID(IPAddressString rid) {
+        if (!rid.isValid())
             throw new IllegalArgumentException("RID isn't valid");
-        if (!rID.isIPv4())
+        if (!rid.isIPv4())
             throw new IllegalArgumentException("RID must be IPv4");
-        if (rID.isEmpty())
+        if (rid.isEmpty())
             throw new IllegalArgumentException("RID cannot be an empty IPAddressString");
-        if (rID.isPrefixed())
+        if (rid.isPrefixed())
             throw new IllegalArgumentException("RID should not be a prefix string");
-        if (rID.isZero())
+        if (rid.isZero())
             throw new IllegalArgumentException("RID cannot be 0.0.0.0");
 
-        this.rID = rID;
+        this.rid = rid;
     }
 
     /**<p><h1>Get Router ID</h1></p>
@@ -56,7 +56,7 @@ public abstract class Node {
      * @return The node's router ID
      */
     public IPAddressString GetRID() {
-        return this.rID;
+        return this.rid;
     }
 
     /**<p><h1>Get Known Neighbours String</h1></p>
@@ -74,12 +74,12 @@ public abstract class Node {
     }
 
     /**<p><h1>Get RID as Bytes</h1></p>
-     * <p>Returns a 4 byte array containing the node RID in bytes</p>
+     * <p>Returns a 4 byte array containing the node rid in bytes</p>
      * @return 4 byte array of the Router ID in Big Endian format
-     * @throws NumberFormatException if the node rID is not a number.
+     * @throws NumberFormatException if the node rid is not a number.
      */
     public byte[] GetRIDBytes() {
-        return rID.getAddress().getBytes();
+        return rid.getAddress().getBytes();
     }
     //endregion
 }
