@@ -59,19 +59,9 @@ public class Launcher {
      * @param args the program args to search through
      */
     private static void SearchFlags(String[] args) {
-        //flag to determine if this argument should be skipped when searching for a flag.
-        boolean flagSkipFlag = false;
-
         //for (args: arg)
         for (int i = 0; i < args.length; i++) {
-            //Check if argument isn't a flag to check, skip if not checking.
-            if (flagSkipFlag) {
-                flagSkipFlag = false;
-                continue;
-            }
-            String arg = args[i];
-
-            switch (arg) {
+            switch (args[i]) {
                 case "--Standard-OSPF" -> {
                     if (!(operationMode == null))
                         LauncherErrorHandle("Cannot use multiple operation modes.");
@@ -90,11 +80,11 @@ public class Launcher {
                 }
                 case "-g", "--with-gui" -> uiThread.start();//Argument to launch GUI
                 case "-c", "--config-file" -> {//Argument to specify a config file path
-                    flagSkipFlag = true;
                     Config.SetConfig(args[i+1]);
+                    i++;
                 }
                 case "--remove-config" -> Config.flagFileConfRemove = true;//Argument useful for testing, will remove the config file.
-                default -> LauncherErrorHandle("Argument not recognised: '" + arg + "'.");//Arg not found. Invalid use of program.
+                default -> LauncherErrorHandle("Argument not recognised: '" + args[i] + "'.");//Arg not found. Invalid use of program.
             }
         }
     }
