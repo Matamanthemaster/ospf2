@@ -219,54 +219,59 @@ public class StdDaemon {
             }
             //endregion GATHER DATA
 
-            //region USE DATA
+            //region USE DATA FOR NEIGHBOURS TABLE
 
-            /*For existing neighbour node in the neighbours table, determine based on state what event has been received.
-            On Down, this is Down->Init HelloReceived event. On Init, if the neighbour is in the neighbours table, this
-            is a 2-WayReceived event.*/
+            //Lookup node, if not exist create it in the neighbours table
             NeighbourNode neighbour = NeighbourNode.GetNeighbourNodeByRID(neighbourRID);
 
-            if (neighbour != null) {
-                neighbour.knownNeighbours = reportedKnownRIDs;//Update knowledge of neighbour nodes
+            if (neighbour == null) {
+                //Treat priority byte as string, parse string -> int
+                int neighbourPriority = Integer.parseUnsignedInt(pBytes[31] + "");
 
-                //Set state correctly.
-                switch (neighbour.GetState()) {
-                    case DOWN -> neighbour.SetState(ExternalStates.INIT);//Down state if neighbour expired already.
-                    case INIT -> {
-                        if (neighbour.knownNeighbours.contains(Config.thisNode.GetRID())) {
-                            neighbour.SetState(ExternalStates.EXSTART);
+                neighbour = new NeighbourNode(neighbourRID, neighbourPriority, pSource);
+                neighbour.knownNeighbours = reportedKnownRIDs;//Set initial knowledge of neighbour nodes
 
-                            /*OSPF event "2-WayReceived", on p2p network, set to ExStart state, and begin exchange
-                            process. On Event 2-WayReceived, it isn't specified that OSPF should send a new packet to
-                            the neighbour node, but this is intended to force event 2-WayReceived on the neighbour
-                            node, so it doesn't have to wait for the hello timer to fire*/
-                            SendHelloPacket(neighbour.rIntOwner);
-                        }
-                    }//case INIT
-                }//switch (neighbour.state)
+                System.out.println("Received packet from new neighbour, with valid checksum. Neighbour ID: " +
+                        neighbour.GetRID());
 
-                neighbour.ResetInactiveTimer();
-                continue;
+                Config.neighboursTable.add(neighbour);
+                Config.thisNode.knownNeighbours.add(neighbourRID);
+
+                /*Not in OSPF spec to send a hello packet on Down -> Init state, but allows quicker convergence, not
+                waiting for hello timer to expire*/
+                SendHelloPacket(neighbour.rIntOwner);
             }
 
-            //Neighbour doesn't exist:
-            //Convert priority from data, use IP from packet header and RID from packet, create neighbour in table.
-            int neighbourPriority = Integer.parseUnsignedInt(pBytes[31] + "");
+            neighbour.knownNeighbours = reportedKnownRIDs;//Update knowledge of neighbour nodes
+            neighbour.ResetInactiveTimer();
+            //endregion USE DATA FOR NEIGHBOURS TABLE
 
-            neighbour = new NeighbourNode(neighbourRID, neighbourPriority, pSource);
-            neighbour.knownNeighbours = reportedKnownRIDs;//Set initial knowledge of neighbour nodes
+            //region SET STATES CORRECTLY
+            if (neighbour.GetState() == ExternalStates.DOWN)
+                neighbour.SetState(ExternalStates.INIT);
 
-            System.out.println("Received packet from new neighbour, with valid checksum. Neighbour ID: " +
-                    neighbour.GetRID());
-
-            Config.neighboursTable.add(neighbour);
-            Config.thisNode.knownNeighbours.add(neighbourRID);
-
-            /*Not in OSPF spec to send a hello packet on Down -> Init state, but allows quicker convergence, not waiting
-            //for hello timer to expire*/
-            SendHelloPacket(neighbour.rIntOwner);
-            //endregion USE DATA
+            /*If in init state and this neighbour reports to know of this current node, this is the conditions for the
+            2WayReceived event. Trigger it*/
+            if (neighbour.GetState() == ExternalStates.INIT && neighbour.knownNeighbours.contains(Config.thisNode.GetRID()))
+                TwoWayReceivedEvent(neighbour);
+            //endregion SET STATES CORRECTLY
         }
+    }
+
+    /**<p><h1>2WayReceived Event</h1></p>
+     * <p>On neighbour state Init, if a node receives a hello packet with its own RID echoed, the event 2WayReceived is
+     * fired. This method is the trigger for the exchange protocol to start for the neighbour node.</p>
+     * @param neighbourNode node that has had the 2WayReceived event trigger
+     */
+    static void TwoWayReceivedEvent(NeighbourNode neighbourNode) {
+        //Quick sanity check TwoWayReceived did occur
+        if (neighbourNode.GetState() != ExternalStates.INIT)
+            return;
+
+        //Set Correct state for event
+        neighbourNode.SetState(ExternalStates.EXSTART);
+
+        //Current future method
     }
 
     /**<p><h1>Make Hello Packet</h1></p>
