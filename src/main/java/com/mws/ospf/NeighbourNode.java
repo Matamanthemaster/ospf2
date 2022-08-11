@@ -121,22 +121,25 @@ public class NeighbourNode extends Node {
      * <p>Trigger on expiring the inactive timer. Sets the neighbour node to the down state, resetting variables</p>
      */
     private void TimerExpire() {
-        this.knownNeighbours.clear();
-        if (!Config.neighboursTable.remove(this))
-            System.err.println("Unexpected Condition:" + System.lineSeparator() +
-                    "Neighbours table didn't include the neighbour " + this.GetRID() + ", and so could not" +
-                    " remove it from the neighbours table on timer expire");
 
         try {
             timerInactivity.cancel();
         } catch (IllegalStateException ignored) {}//IllegalStateException: Timer already cancelled.
 
-        System.out.println("Dead timer expired: " + this.GetRID());
+        this.knownNeighbours.clear();
         this.SetState(ExternalStates.DOWN);
+        System.out.println("Dead timer expired: " + this.GetRID());
 
+        //Close unicast socket for exchange communication
         if (unicastSocket != null)
             if (!unicastSocket.isClosed())
                unicastSocket.close();
+
+        //Update neighbours on topology change
+        if (Launcher.operationMode.equals("standard"))
+            StdDaemon.SendHelloPacket();
+        /*if (Launcher.operationMode.equals("encrypted"))
+            EncDaemon.SendHelloPacket();*/
     }
     //endregion
 }

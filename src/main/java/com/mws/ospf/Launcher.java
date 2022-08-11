@@ -17,7 +17,7 @@ public class Launcher {
                     "   --Encrypted-OSPF" + System.lineSeparator();
     private static Thread uiThread;
     private static Thread daemonThread;
-    private static String operationMode;
+    static String operationMode;
     //endregion
 
     //region STATIC METHODS

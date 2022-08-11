@@ -70,7 +70,7 @@ public class StdDaemon {
         timerHelloSend.schedule(new TimerTask() {
             @Override
             public void run() {
-                SendHelloPacket(null);
+                SendHelloPacket();
             }
         }, 0, 10 * 1000);
 
@@ -82,11 +82,8 @@ public class StdDaemon {
      * <p>Method used to send a hello packet. Uses the method MakeHelloPacket for the packet buffer, using  socketHello
      * multicast socket to send to each RouterInterface.</p>
      * <p>Can be called individually to send a packet. Also is the TimerTask that executes on timerHelloSend tick</p>
-     * <p>sendInterface can be specified to limit the hello packet send to a specific interface, for the purpose of
-     * forcing an adjacency to form quicker, by sending a more up-to-date hello packet, and hopefully receiving one.</p>
-     * @param sendInterface A specific interface to send to. Either null or a RouterInterface
      */
-    private static void SendHelloPacket(RouterInterface sendInterface) {
+    static void SendHelloPacket() {
 
         //Make buffer
         byte[] helloBuffer = MakeHelloPacket();
@@ -95,17 +92,7 @@ public class StdDaemon {
         try {
             DatagramPacket helloPacket = new DatagramPacket(helloBuffer, helloBuffer.length, socAddrHello);
 
-            //sendInterface is specified, only send hello on the specified interface.
-            if (sendInterface != null) {
-                if (!sendInterface.isEnabled)
-                    DaemonErrorHandle("SendHelloPacket: sendInterface specified is disabled.", null);
-
-                socketHello.setNetworkInterface(sendInterface.ToNetworkInterface());
-                socketHello.send(helloPacket);
-                return;
-            }
-
-            //sendInterface is null, send packet to all enabled interfaces.
+            //send packet to all enabled interfaces.
             for (RouterInterface rInt: Config.thisNode.interfaceList) {
                 if (!rInt.isEnabled)
                     continue;
@@ -229,7 +216,6 @@ public class StdDaemon {
                 int neighbourPriority = Integer.parseUnsignedInt(pBytes[31] + "");
 
                 neighbour = new NeighbourNode(neighbourRID, neighbourPriority, pSource);
-                neighbour.knownNeighbours = reportedKnownRIDs;//Set initial knowledge of neighbour nodes
 
                 System.out.println("Received packet from new neighbour, with valid checksum. Neighbour ID: " +
                         neighbour.GetRID());
@@ -239,7 +225,7 @@ public class StdDaemon {
 
                 /*Not in OSPF spec to send a hello packet on Down -> Init state, but allows quicker convergence, not
                 waiting for hello timer to expire*/
-                SendHelloPacket(neighbour.rIntOwner);
+                SendHelloPacket();
             }
 
             neighbour.knownNeighbours = reportedKnownRIDs;//Update knowledge of neighbour nodes
@@ -320,19 +306,14 @@ public class StdDaemon {
         //not for this experiment
 
         //Append neighbours
-        byte[] neighboursBuffer = new byte[Config.neighboursTable.size() * 4];
-
-        int byteOffset = 0;
         for (NeighbourNode neighbour: Config.neighboursTable) {
-            byte[] rid = neighbour.GetRIDBytes();
-            neighboursBuffer[byteOffset] = rid[0];
-            neighboursBuffer[byteOffset + 1] = rid[1];
-            neighboursBuffer[byteOffset + 2] = rid[2];
-            neighboursBuffer[byteOffset + 3] = rid[3];
+            //Skip over non-adjacent nodes
+            if (neighbour.GetState() == ExternalStates.DOWN)
+                continue;
 
-            byteOffset += 4;
+            ospfBuffer = Bytes.concat(ospfBuffer, neighbour.GetRIDBytes());
         }
-        ospfBuffer = Bytes.concat(ospfBuffer, neighboursBuffer);
+
 
         //Update packet length (2, 3)
         int packetLength = ospfBuffer.length;

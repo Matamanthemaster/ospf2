@@ -16,7 +16,13 @@ import javafx.scene.layout.VBox;
 import javafx.stage.WindowEvent;
 import javafx.util.Duration;
 
+/**<p><h1>JavaFX GUI Scene Controller</h1></p>
+ * <p>Controller class for the GUI application in the artefact. Allows manipulation of the JavaFX application
+ * programmatically by firing events specified in the FXML document. On event firings, specified methods are called,
+ * able to manipulate other elements of the GUI application.</p>
+ */
 public class UIController {
+    //region OBJECT PROPERTIES
     @FXML private Label lblOutStatus;
     //@FXML private Label lblDispRID;
     @FXML private TextField txtRID;
@@ -24,20 +30,36 @@ public class UIController {
     private Timeline timerUpdateGUI = new Timeline(
             new KeyFrame(Duration.seconds(1),
                     event -> UpdateTimerTick(event)));
+    //endregion OBJECT PROPERTIES
 
+    //region STATIC METHODS
+    /**<p><h1>Stage OnClose Event</h1></p>
+     * <p>Static event triggered on window close. Set up as event in UIEntry.start method</p>
+     * @param ev event parameters
+     */
+    static void OnClose(WindowEvent ev){
+        System.exit(0);
+    }
+    //endregion STATIC METHODS
 
+    //region OBJECT METHODS
+    /**<p><h1>UI Initialise</h1></p>
+     * <p>Called on creation of the scene. Closest thing to an object constructor</p>
+     */
     @FXML
-    protected void initialize()
-    {
+    protected void initialize() {
         txtRID.setText(String.valueOf(Config.thisNode.GetRID()));
         tbpNeighbours.getTabs().clear();
         timerUpdateGUI.setCycleCount(Timeline.INDEFINITE);
         timerUpdateGUI.play();
     }
 
+    /**<p><h1>TxtRID Key Pressed Event</h1></p>
+     * <p>Event fired on TxtRID Key Pressed. Updates this node's RID.</p>
+     * @param ev Key event parameters
+     */
     @FXML
-    protected void TxtRIDKeyPressed(KeyEvent ev)
-    {
+    protected void TxtRIDKeyPressed(KeyEvent ev) {
         //On Key enter, update RID
         if (ev.getCode() == KeyCode.ENTER) {
             try {
@@ -50,6 +72,10 @@ public class UIController {
         }
     }
 
+    /**<p><h1>Update Timer Tick</h1></p>
+     * <p>Called when the update timeline fires, updating the UI elements every second</p>
+     * @param ev event parameters
+     */
     private void UpdateTimerTick(ActionEvent ev) {
         for (NeighbourNode n : Config.neighboursTable) {
             if (!tbpNeighbours.getTabs().contains(n.tab)) {
@@ -65,6 +91,12 @@ public class UIController {
 
 
     }
+
+    /**<p><h1>Add Neighbour to GUI</h1></p>
+     * <p>Takes a neighbour node and creates a tab, storing it in the tab for the neighbour node. Will create the visible
+     * elements, and populate initial values</p>
+     * @param n Neighbour node being added to the UI.
+     */
     private void AddGUINeighbour(NeighbourNode n) {
         HBox hbTabRoot = new HBox();
         VBox vbTabPropNames = new VBox();
@@ -90,8 +122,5 @@ public class UIController {
 
         tbpNeighbours.getTabs().add(n.tab);
     }
-
-    static void OnClose(WindowEvent ev){
-        System.exit(0);
-    }
+    //endregion OBJECT METHODS
 }

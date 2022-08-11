@@ -60,10 +60,14 @@ public abstract class Node {
     }
 
     /**<p><h1>Get Known Neighbours String</h1></p>
-     * <p>Returns a list of known neighbours as a comma separated string list</p>
+     * <p>Returns a list of known neighbours as a comma separated string list. If no known neighbours exist, an empty
+     * string is returned</p>
      * @return List of known neighbours, as comma separated list.
      */
     public String GetKnownNeighboursString() {
+        if (knownNeighbours.size() == 0)
+            return "";
+
         String neighbours = "";
         for (IPAddressString neighbour: knownNeighbours)
         {
