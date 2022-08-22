@@ -10,9 +10,8 @@ public class EncDaemon{
     //endregion
 
     //region STATIC METHODS
-    public static void Main()
-    {
-
+    public static void Main() {
+        System.out.println("Standard Daemon Program Run");
     }
     //endregion
 }

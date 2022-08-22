@@ -34,6 +34,7 @@ public class StdDaemon {
      * implemented methods to handle communication. Init the normal process flow of OSPF.</p>
      */
     static void Main() {
+        System.out.println("Standard Daemon Program Run");
         //region SET HELLOSOCKET
         //used for multicasting. Binds the ospf multicast address to all interfaces using this socket.
         socketHello = null;
@@ -351,7 +352,7 @@ public class StdDaemon {
         timerHelloSend.cancel();
         threadHelloListen.interrupt();
         socketHello.close();
-        System.exit(-2);
+        System.exit(-3);
     }
     //endregion
 }

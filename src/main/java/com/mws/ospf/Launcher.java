@@ -1,5 +1,12 @@
 package com.mws.ospf;
 
+import java.io.IOException;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
+
 /**<p><h1>Application Launcher</h1></p>
  * <p>Entrypoint into the application. Contains process flow to start application, via checking flags, setting up
  * the configuration class and creating a thread for the main process flow daemon being tested</p>
@@ -9,15 +16,20 @@ public class Launcher {
     private final static String commandUsage =
             "Usage: java -jar ospf.jar [arguments] <Operation Mode Flag>" + System.lineSeparator() +
                     "Arguments:" + System.lineSeparator() +
-                    "   --help:                     Prints this help message" + System.lineSeparator() +
-                    "   -g, --with-gui:             Runs the program with the GUI frontend" + System.lineSeparator() +
-                    "   -c, --config-file <Path>    Specify an alternate config file (Default ./ospf.conf.xml)" + System.lineSeparator() +
+                    "   --help                      Prints this help message" + System.lineSeparator() +
+                    "   -g, --with-gui              Runs the program with the GUI frontend" + System.lineSeparator() +
+                    "   -c, --config-file <Path     Specify an alternate config file (Default ./ospf.conf.xml)" + System.lineSeparator() +
+                    "   -w, --wait                  Tell the application to wait for a start signal from an adjacent node" + System.lineSeparator() +
+                    "   -s, --start-exp             Tell the application to send a start signal to all connected nodes" + System.lineSeparator() +
                     "Operation Mode Flags:" + System.lineSeparator() +
                     "   --Standard-OSPF" + System.lineSeparator() +
                     "   --Encrypted-OSPF" + System.lineSeparator();
     private static Thread uiThread;
-    private static Thread daemonThread;
+    static Thread daemonThread;
     static String operationMode;
+    static boolean flagWait;
+    static boolean flagStart;
+    static MulticastSocket socketExperimentWait;
     //endregion
 
     //region STATIC METHODS
@@ -49,9 +61,75 @@ public class Launcher {
         else
             LauncherErrorHandle("Could not create a daemon thread. Launcher.operationMode is null.");
 
-        //Create thread, run thread.
-        System.out.println("Daemon Program Run");
-        daemonThread.start();
+        //If the wait logic doesn't apply to this program run, start the chosen daemon thread as usual.
+        if (!flagWait && !flagStart)
+            daemonThread.start();
+
+
+        //region WAIT LOGIC
+        if (flagWait & flagStart)
+            LauncherErrorHandle("wait and start-exp flags cannot be both set");
+
+        //Set up epoch time for execution. On wait node, this will just be overridden. On send node, will be sent
+        //to connected nodes, and used to synchronise with them. This logic is all oneshot.
+        long startTimeEpoch = (System.currentTimeMillis()/1000) + 2;
+
+        try {
+            //Create a broadcast socket, create a datagram packet to send
+            socketExperimentWait = new MulticastSocket(25566);
+            socketExperimentWait.setBroadcast(true);
+
+            String message = String.valueOf(startTimeEpoch);
+            DatagramPacket packetWait = new DatagramPacket(
+                    message.getBytes(StandardCharsets.UTF_8),
+                    message.length(),
+                    InetAddress.getByName("255.255.255.255"),
+                    25566);
+
+            //if sending, send the packet. If waiting, block the thread with receive, then get the epoch timestamp
+            //sent, convert it to a long for use later.
+            if (flagStart) {
+                System.out.println("Wait: Sending start epoch");
+                for (RouterInterface r: Config.thisNode.interfaceList) {
+                    //skip over enabled interfaces, mainly want to send to the NAT bridge interface, to all nodes.
+                    //Does not really matter, all nodes will get the packets anyway.
+                    if (r.isEnabled)
+                        continue;
+                    System.out.println(r.GetName());
+                    System.out.println(r.isEnabled);
+
+                    packetWait.setAddress(r.addrIPv4.toMaxHost().toInetAddress());
+                    socketExperimentWait.setNetworkInterface(r.ToNetworkInterface());
+                    socketExperimentWait.send(packetWait);
+                }
+            } else {
+                System.out.println("Wait: Waiting for start epoch");
+                socketExperimentWait.receive(packetWait);
+                String epochString = new String(packetWait.getData(), StandardCharsets.UTF_8);
+                startTimeEpoch = Long.parseLong(epochString);
+                System.out.println("Wait: Epoch received from " + packetWait.getAddress().toString() + ": " + epochString);
+            }
+        } catch (SocketException ex) {
+            LauncherErrorHandle("Socket exception when setting up wait socket. " + ex.getMessage());
+        } catch (UnknownHostException ex) {
+            LauncherErrorHandle("Could not get IP address 255.255.255.255. Not likely to occur in runtime.");
+        } catch (IOException ex) {
+            LauncherErrorHandle("IOException when sending or receiving a datagram packet.");
+        } catch (NumberFormatException ex) {
+            LauncherErrorHandle("Exception: Could not convert received data from sending node to an epoch long.");
+        }
+
+        //Packets have been sent or received. For each node, now set a oneshot timer based on the epoch start time.
+        //Used to synchronise all nodes start times. On timer expire, start timer thread, as the program would without
+        //wait logic
+        Timer timerWait = new Timer("Wait-Timer");
+        timerWait.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                Stat.SetupStats();
+                daemonThread.start();
+            }}, new Date(startTimeEpoch * 1000));
+        //endregion WAIT LOGIC
     }
 
     /**<p><h1>Search Flags</h1></p>
@@ -83,6 +161,8 @@ public class Launcher {
                     Config.SetConfig(args[i+1]);
                     i++;
                 }
+                case "-w", "--wait" -> flagWait = true;
+                case "-s", "--start-exp" -> flagStart = true;
                 case "--remove-config" -> Config.flagFileConfRemove = true;//Argument useful for testing, will remove the config file.
                 default -> LauncherErrorHandle("Argument not recognised: '" + args[i] + "'.");//Arg not found. Invalid use of program.
             }
