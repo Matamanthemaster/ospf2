@@ -327,6 +327,17 @@ public class Config {
         }
     }
 
+    /**<p><h1>Check Config Exists</h1></p>
+     * <p>Determine the status of the config file</p>
+     * @return true if the file is set in the config and exists
+     */
+    static boolean ConfigExists() {
+        if (fileConfig == null) {
+            return false;
+        }
+        return fileConfig.exists();
+    }
+
     /**<p><h1>Get XML Element Helper</h1></p>
      * <p>Get a DOM element for a specified tag, limit one tag. If the tag exists, get that existing tag. Tag will be created if it doesn't exist.</p>
      * <p>Used internally to read and write DOM xml document.</p>
@@ -344,19 +355,6 @@ public class Config {
         } else//Get element
             newElement = (Element) rootElement.getElementsByTagName(tagName).item(0);
         return newElement;
-    }
-
-    /**<p><h1>Check Config Exists</h1></p>
-     * <p>Determine the status of the config file</p>
-     * @return true if the file is set in the config and exists
-     */
-    static boolean ConfigExists() {
-        if (fileConfig == null)
-        {
-            return false;
-        }
-
-        return fileConfig.exists();
     }
 
     /**<p><h1>Error Handle (Config)</h1></p>
