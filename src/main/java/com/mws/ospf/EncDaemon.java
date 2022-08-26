@@ -11,7 +11,11 @@ public class EncDaemon{
 
     //region STATIC METHODS
     public static void Main() {
-        System.out.println("Standard Daemon Program Run");
+        System.out.println("Encrypted Daemon Program Run");
+
+        //Start stat process if conditions set
+        if (Stat.endNoAdjacencies != -1)
+            Stat.SetupStats();
     }
     //endregion
 }

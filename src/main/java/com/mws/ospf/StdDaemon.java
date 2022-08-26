@@ -35,6 +35,11 @@ public class StdDaemon {
      */
     static void Main() {
         System.out.println("Standard Daemon Program Run");
+
+        //Start stat process if conditions set
+        if (Stat.endNoAdjacencies != -1)
+            Stat.SetupStats();
+
         //region SET HELLOSOCKET
         //used for multicasting. Binds the ospf multicast address to all interfaces using this socket.
         socketHello = null;
@@ -258,7 +263,11 @@ public class StdDaemon {
         //Set Correct state for event
         neighbourNode.SetState(ExternalStates.EXSTART);
 
+
         //Current future method
+        //Statistics Endpoint test
+        if (Config.thisNode.knownNeighbours.size() >= Stat.endNoAdjacencies && Stat.endNoAdjacencies != -1)
+            Stat.EndStats();
     }
 
     /**<p><h1>Make Hello Packet</h1></p>

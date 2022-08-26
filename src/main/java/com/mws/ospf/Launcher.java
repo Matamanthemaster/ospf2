@@ -1,5 +1,6 @@
 package com.mws.ospf;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -18,9 +19,11 @@ public class Launcher {
                     "Arguments:" + System.lineSeparator() +
                     "   --help                      Prints this help message" + System.lineSeparator() +
                     "   -g, --with-gui              Runs the program with the GUI frontend" + System.lineSeparator() +
-                    "   -c, --config-file <Path     Specify an alternate config file (Default ./ospf.conf.xml)" + System.lineSeparator() +
-                    "   -w, --wait                  Tell the application to wait for a start signal from an adjacent node" + System.lineSeparator() +
-                    "   -s, --start-exp             Tell the application to send a start signal to all connected nodes" + System.lineSeparator() +
+                    "   -c, --config-file </Path>   Specify an alternate config file (Default ./ospf.conf.xml)" + System.lineSeparator() +
+                    "   -W, --wait                  Tell the application to wait for a start signal from an adjacent node" + System.lineSeparator() +
+                    "   -S, --start-exp             Tell the application to send a start signal to all connected nodes" + System.lineSeparator() +
+                    "   -s, --stats-file </Path>    Specify an alternative statistic file path (Default ./ospf.stats.csv)" + System.lineSeparator() +
+                    "   -n  --adjacency-no #        Specify how many " + System.lineSeparator() +
                     "Operation Mode Flags:" + System.lineSeparator() +
                     "   --Standard-OSPF" + System.lineSeparator() +
                     "   --Encrypted-OSPF" + System.lineSeparator();
@@ -65,7 +68,6 @@ public class Launcher {
         if (!flagWait && !flagStart)
             daemonThread.start();
 
-
         //region WAIT LOGIC
         if (flagWait & flagStart)
             LauncherErrorHandle("wait and start-exp flags cannot be both set");
@@ -95,8 +97,6 @@ public class Launcher {
                     //Does not really matter, all nodes will get the packets anyway.
                     if (r.isEnabled)
                         continue;
-                    System.out.println(r.GetName());
-                    System.out.println(r.isEnabled);
 
                     packetWait.setAddress(r.addrIPv4.toMaxHost().toInetAddress());
                     socketExperimentWait.setNetworkInterface(r.ToNetworkInterface());
@@ -126,7 +126,6 @@ public class Launcher {
         timerWait.schedule(new TimerTask() {
             @Override
             public void run() {
-                Stat.SetupStats();
                 daemonThread.start();
             }}, new Date(startTimeEpoch * 1000));
         //endregion WAIT LOGIC
@@ -142,13 +141,13 @@ public class Launcher {
             switch (args[i]) {
                 case "--Standard-OSPF" -> {
                     if (!(operationMode == null))
-                        LauncherErrorHandle("Cannot use multiple operation modes.");
+                        LauncherErrorHandle("Cannot use multiple operation modes");
 
                     operationMode = "standard";
                 }
                 case "--Encrypted-OSPF" -> {
                     if (!(operationMode == null))
-                        LauncherErrorHandle("Cannot use multiple operation modes.");
+                        LauncherErrorHandle("Cannot use multiple operation modes");
 
                     operationMode = "encrypted";
                 }
@@ -158,11 +157,31 @@ public class Launcher {
                 }
                 case "-g", "--with-gui" -> uiThread.start();//Argument to launch GUI
                 case "-c", "--config-file" -> {//Argument to specify a config file path
-                    Config.SetConfig(args[i+1]);
+                    try {
+                        Config.SetConfig(args[i+1]);
+                    } catch (ArrayIndexOutOfBoundsException ex) {
+                        LauncherErrorHandle("Path for the --config-file flag was missing");
+                    }
                     i++;
                 }
-                case "-w", "--wait" -> flagWait = true;
-                case "-s", "--start-exp" -> flagStart = true;
+                case "-W", "--wait" -> flagWait = true;
+                case "-S", "--start-exp" -> flagStart = true;
+                case "-s", "--stats-file" -> {
+                    try {
+                        Stat.fileStats = new File(args[i+1]);
+                    } catch (NullPointerException | ArrayIndexOutOfBoundsException ex) {
+                        LauncherErrorHandle("Path for the --stats-file flag was invalid or missing");
+                    }
+                    i++;
+                }
+                case "-n", "--adjacency-no" -> {
+                    try {
+                        Stat.endNoAdjacencies = Integer.parseInt(args[i+1]);
+                    } catch (NumberFormatException | ArrayIndexOutOfBoundsException ex) {
+                        LauncherErrorHandle("the number of adjacencies for the --adjacency-no flag was either missing or not an integer");
+                    }
+                    i++;
+                }
                 case "--remove-config" -> Config.flagFileConfRemove = true;//Argument useful for testing, will remove the config file.
                 default -> LauncherErrorHandle("Argument not recognised: '" + args[i] + "'.");//Arg not found. Invalid use of program.
             }
