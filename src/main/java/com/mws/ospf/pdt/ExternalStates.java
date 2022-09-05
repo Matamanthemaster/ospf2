@@ -13,7 +13,7 @@ public enum ExternalStates {
     LOADING(5),
     FULL(6);
 
-    public byte value;
+    public final byte value;
 
     /**<p><h1>Map ExternalState enum to value</h1></p>
      * @param value value of a state, to be translated to one byte

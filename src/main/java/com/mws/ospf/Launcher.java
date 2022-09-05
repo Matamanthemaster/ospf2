@@ -49,8 +49,8 @@ public class Launcher {
             SearchFlags(args);
 
         //Setup config if it wasn't made from args.
-        if (!Config.ConfigExists())
-            Config.SetConfig();
+        if (!Config.getConfigExists())
+            Config.setConfig();
 
         //Entry point for CLI daemon.
         if (operationMode == null)
@@ -65,8 +65,10 @@ public class Launcher {
             LauncherErrorHandle("Could not create a daemon thread. Launcher.operationMode is null.");
 
         //If the wait logic doesn't apply to this program run, start the chosen daemon thread as usual.
-        if (!flagWait && !flagStart)
+        if (!flagWait && !flagStart) {
             daemonThread.start();
+            return;
+        }
 
         //region WAIT LOGIC
         if (flagWait & flagStart)
@@ -91,7 +93,7 @@ public class Launcher {
             //if sending, send the packet. If waiting, block the thread with receive, then get the epoch timestamp
             //sent, convert it to a long for use later.
             if (flagStart) {
-                System.out.println("Wait: Sending start epoch");
+                PrintToUser("Wait: Sending start epoch");
                 for (RouterInterface r: Config.thisNode.interfaceList) {
                     //skip over enabled interfaces, mainly want to send to the NAT bridge interface, to all nodes.
                     //Does not really matter, all nodes will get the packets anyway.
@@ -103,11 +105,11 @@ public class Launcher {
                     socketExperimentWait.send(packetWait);
                 }
             } else {
-                System.out.println("Wait: Waiting for start epoch");
+                PrintToUser("Wait: Waiting for start epoch");
                 socketExperimentWait.receive(packetWait);
                 String epochString = new String(packetWait.getData(), StandardCharsets.UTF_8);
                 startTimeEpoch = Long.parseLong(epochString);
-                System.out.println("Wait: Epoch received from " + packetWait.getAddress().toString() + ": " + epochString);
+                PrintToUser("Wait: Epoch received from " + packetWait.getAddress().toString() + ": " + epochString);
             }
         } catch (SocketException ex) {
             LauncherErrorHandle("Socket exception when setting up wait socket. " + ex.getMessage());
@@ -158,7 +160,7 @@ public class Launcher {
                 case "-g", "--with-gui" -> uiThread.start();//Argument to launch GUI
                 case "-c", "--config-file" -> {//Argument to specify a config file path
                     try {
-                        Config.SetConfig(args[i+1]);
+                        Config.setConfig(args[i+1]);
                     } catch (ArrayIndexOutOfBoundsException ex) {
                         LauncherErrorHandle("Path for the --config-file flag was missing");
                     }
@@ -215,12 +217,18 @@ public class Launcher {
      * @param buffer Buffer to print to stdout
      */
     public static void PrintBuffer(byte[] buffer) {
-        System.out.print("Packet Buffer: ");
+        System.out.print("Buffer[" + buffer.length + "]: ");
         for (byte b: buffer)
         {
             System.out.print(String.format("%02X", b) + " ");
         }
         System.out.println();
+    }
+
+    static void PrintToUser(String message) {
+        System.out.print("[OSPFv" + (operationMode.equals("standard") ? "2":"4"));
+        System.out.print("@" + Config.thisNode.hostname + "]: ");
+        System.out.println(message);
     }
 
     /**<p><h1>Error Handle (Launcher)</h1></p>

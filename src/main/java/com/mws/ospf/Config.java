@@ -47,8 +47,8 @@ public class Config {
      * <p></p>
      * <p>Uses default path: ./ospf.conf.xml</p>
      */
-    static void SetConfig() {
-        CommonMain(System.getProperty("user.dir") + System.getProperty("file.separator") + "ospf.conf.xml");
+    static void setConfig() {
+        commonMain(System.getProperty("user.dir") + System.getProperty("file.separator") + "ospf.conf.xml");
     }
 
     /**<p><h1>Set Config File</h1></p>
@@ -56,30 +56,30 @@ public class Config {
      * already exist. Also populates local variables with values from the config.</p>
      * @param path config file path
      */
-    static void SetConfig(String path) {
-        CommonMain(path);
+    static void setConfig(String path) {
+        commonMain(path);
     }
 
     /**<p><h1>Config Main Method</h1></p>
      * <p>Main start method that performs the common jobs, instead of copying code between set methods.</p>
      * @param path Config file path
      */
-    private static void CommonMain(String path) {
+    private static void commonMain(String path) {
         fileConfig = new File(path);
         if (flagFileConfRemove)
             fileConfig.delete();
 
-        if (!ConfigExists()) {
+        if (!getConfigExists()) {
             try {
-                MakeConfig();
+                makeConfig();
             } catch (SocketException | UnknownHostException | AddressStringException e) {
                 e.printStackTrace();
-                ConfigErrorHandle("An exception occurred while trying to make the config. See the above stack trace" +
+                handleConfigError("An exception occurred while trying to make the config. See the above stack trace" +
                         "for details.");
             }
         }
 
-        ReadConfig();
+        readConfig();
     }
 
     /**<p><h1>Generate Config</h1></p>
@@ -88,7 +88,7 @@ public class Config {
      * a config file with path specified to CommonMain</p>
      * <p>>Uses file path in static File property 'Config.fileConfig'.</p>
      */
-    private static void MakeConfig() throws SocketException, UnknownHostException, AddressStringException {
+    private static void makeConfig() throws SocketException, UnknownHostException, AddressStringException {
 
         List<RouterInterface> routerInterfaces = new ArrayList<>();
 
@@ -125,7 +125,7 @@ public class Config {
 
         thisNode = new ThisNode(new IPAddressString("0.0.0.1"), "Router", routerInterfaces);
 
-        WriteConfig();
+        writeConfig();
         System.out.println("The config file has been made for the first time. Please change the config file at '" +
                 fileConfig.getPath() + "', then run the program again.");
         System.exit(0);
@@ -160,14 +160,14 @@ public class Config {
      * <p>Reads data from the config file stored in static File 'Config.fileConfig'. Populates application config class
      * properties with data from the config xml document file.</p>
      */
-    static void ReadConfig() {
-        if (!ConfigExists())
+    static void readConfig() {
+        if (!getConfigExists())
         {
             try {
-                MakeConfig();
+                makeConfig();
             } catch (SocketException | UnknownHostException | AddressStringException e) {
                 e.printStackTrace();
-                ConfigErrorHandle("An exception occurred while creating a new config. See the above stack trace for" +
+                handleConfigError("An exception occurred while creating a new config. See the above stack trace for" +
                         "details.");
             }
         }
@@ -224,11 +224,11 @@ public class Config {
                 //Check before building an interface that invalid values are not found. Otherwise, this is an illegal
                 //state.
                 if (curIntIPv4 == null)
-                    ConfigErrorHandle("Unexpected value: interface \"" + curIntName + "\"'s IPv4 address doesn't exist" +
+                    handleConfigError("Unexpected value: interface \"" + curIntName + "\"'s IPv4 address doesn't exist" +
                             " in the config file. IPv4 is required for ipv4. Please add 'IPv4' child with a valid" +
                             " value");
                 if (curIntType == null)
-                    ConfigErrorHandle("Unexpected value: interface \"" + curIntName + "\"'s interface type doesn't" +
+                    handleConfigError("Unexpected value: interface \"" + curIntName + "\"'s interface type doesn't" +
                             " exist in the config file. Please add 'Type' child with a valid value.");
 
 
@@ -240,7 +240,7 @@ public class Config {
 
         } catch (ParserConfigurationException | SAXException | IOException | AddressStringException e) {
             e.printStackTrace();
-            ConfigErrorHandle("An exception occurred while reading the config file. See the stack trace above.");
+            handleConfigError("An exception occurred while reading the config file. See the stack trace above.");
         }
     }
 
@@ -249,9 +249,9 @@ public class Config {
      * 'Config.fileConfig'. Datastructures stored statically in the config class are formatted with tags in the specific
      * structure, pictured above ReadConfig().</p>
      */
-    static void WriteConfig() {
+    static void writeConfig() {
         try {
-            if (ConfigExists()) {
+            if (getConfigExists()) {
                 fileConfig.delete();
                 fileConfig.createNewFile();
             }
@@ -271,24 +271,24 @@ public class Config {
                 confRoot = (Element) confDoc.getElementsByTagName("config").item(0);
 
             //Setup hostname element. Set hostname text content to the stored config.
-            Element confHostname = _GetConfigElementFromRoot(confDoc, confRoot, "Hostname");
+            Element confHostname = getConfigElementFromRoot(confDoc, confRoot, "Hostname");
             confHostname.setTextContent(thisNode.hostname);
 
             //setup nid element. Set nid text content to the stored config.
-            Element configRID = _GetConfigElementFromRoot(confDoc, confRoot, "RID");
+            Element configRID = getConfigElementFromRoot(confDoc, confRoot, "RID");
             configRID.setTextContent(String.valueOf(thisNode.GetRID()));
 
             //Create interfaces root.
-            Element confInterfacesRoot = _GetConfigElementFromRoot(confDoc, confRoot, "interfaces");
+            Element confInterfacesRoot = getConfigElementFromRoot(confDoc, confRoot, "interfaces");
 
             //Now the harder part. Create interfaces.
             for (RouterInterface curRInt: thisNode.interfaceList)
             {
                 //Current interface element (e.g. <enp5s0></enp5s0>)
-                Element confCurRInt = _GetConfigElementFromRoot(confDoc, confInterfacesRoot, curRInt.GetName());
+                Element confCurRInt = getConfigElementFromRoot(confDoc, confInterfacesRoot, curRInt.GetName());
 
                 //IPv4 Address (e.g. 192.168.1.20/24)
-                Element confCurRIntIPv4 = _GetConfigElementFromRoot(confDoc, confCurRInt, "IPv4");
+                Element confCurRIntIPv4 = getConfigElementFromRoot(confDoc, confCurRInt, "IPv4");
                 confCurRIntIPv4.setTextContent(curRInt.addrIPv4.toPrefixLengthString());
 
                 //IPv6 Address. First remove all existing elements, then recreate elements. This is the simplest way.
@@ -307,11 +307,11 @@ public class Config {
                 }
 
                 //InterfaceType (e.g. T1)
-                Element confCurRIntType = _GetConfigElementFromRoot(confDoc, confCurRInt, "Type");
+                Element confCurRIntType = getConfigElementFromRoot(confDoc, confCurRInt, "Type");
                 confCurRIntType.setTextContent(curRInt.type.toString());
 
                 //Enabled state (e.g. true)
-                Element confCurRintEnabled = _GetConfigElementFromRoot(confDoc, confCurRInt, "Enabled");
+                Element confCurRintEnabled = getConfigElementFromRoot(confDoc, confCurRInt, "Enabled");
                 confCurRintEnabled.setTextContent(String.valueOf(curRInt.isEnabled));
             }
 
@@ -323,7 +323,7 @@ public class Config {
 
         } catch (ParserConfigurationException | IOException | TransformerException e) {
             e.printStackTrace();
-            ConfigErrorHandle("Exception when creating the XML document in Config.WriteConfig(). See the stack trace above");
+            handleConfigError("Exception when creating the XML document in Config.WriteConfig(). See the stack trace above");
         }
     }
 
@@ -335,7 +335,7 @@ public class Config {
      * @param tagName the tag to get from the parent
      * @return the requested child DOM element, from tag name
      */
-    private static Element _GetConfigElementFromRoot(@NotNull Document confDoc, @NotNull Element rootElement, @NotNull String tagName) {
+    private static Element getConfigElementFromRoot(@NotNull Document confDoc, @NotNull Element rootElement, @NotNull String tagName) {
         Element newElement;
         if (rootElement.getElementsByTagName(tagName).getLength() == 0)//Set element
         {
@@ -350,7 +350,7 @@ public class Config {
      * <p>Determine the status of the config file</p>
      * @return true if the file is set in the config and exists
      */
-    static boolean ConfigExists() {
+    static boolean getConfigExists() {
         if (fileConfig == null)
         {
             return false;
@@ -363,7 +363,7 @@ public class Config {
      * <p>More graceful and standard exit to the Config class, usually during exception handling</p>
      * @param message the message to display to the user
      */
-    private static void ConfigErrorHandle(String message) {
+    private static void handleConfigError(String message) {
         System.err.println(message);
         System.exit(-2);
     }

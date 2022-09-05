@@ -64,7 +64,7 @@ public class UIController {
         if (ev.getCode() == KeyCode.ENTER) {
             try {
                 Config.thisNode.SetRID(new IPAddressString(txtRID.getText()));
-                Config.WriteConfig();
+                Config.writeConfig();
             } catch (IllegalArgumentException ex) {
                 lblOutStatus.setText("RID was invalid, reverted to default value");
                 txtRID.setText(Config.thisNode.GetRID().toString());

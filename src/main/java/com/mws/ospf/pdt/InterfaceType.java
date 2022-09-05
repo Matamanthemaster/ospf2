@@ -62,7 +62,7 @@ public enum InterfaceType {
      * <p>Get the bandwidth associated with a specific enum of InterfaceType</p>
      * @return Interface Bandwidth
      */
-    public long GetBandwidth()
+    public long getBandwidth()
     {
         return this.bandwidth;
     }

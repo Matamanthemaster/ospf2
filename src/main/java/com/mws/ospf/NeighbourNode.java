@@ -5,15 +5,13 @@ import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
 import javafx.scene.control.Tab;
 
-import java.net.DatagramSocket;
 import java.util.Timer;
 import java.util.TimerTask;
 
 /**<p><h1>Neighbour Node</h1></p>
  * <p>A variation of node which is a neighbour to thisNode. Contains specifics of known information about this node, and
  * specifics for direct communication with this node.</p>
- * <p>Also contains a cheat sheet of all created neighbour nodes to allow program code to easily find a neighbour node
- * by RID, without </p>
+ * <p>Static methods exist as helpers</p>
  */
 public class NeighbourNode extends Node {
     //region STATIC METHODS
@@ -43,15 +41,13 @@ public class NeighbourNode extends Node {
     //endregion
 
     //region OBJECT PROPERTIES
+    public int priority = -1;
     private ExternalStates state = ExternalStates.DOWN;
+    public IPAddress ipAddress;
+    public final RouterInterface rIntOwner;
+    EncryptionParameters  enParam;
     Timer timerInactivity;
     private boolean flagTimerInactRunning = false;
-    public int priority;
-    public IPAddress ipAddress;
-
-    //Variable used for unicast datagram communication with this specific neighbour. Used in DBD packet and SLR/U
-    public DatagramSocket unicastSocket;
-    public final RouterInterface rIntOwner;
     public Tab tab;
     //endregion
 
@@ -61,19 +57,12 @@ public class NeighbourNode extends Node {
      * neighbour.</p>
      * <p>Will also add the neighbour to a list of all neighbour nodes, for easy searching</p>
      * @param rid the neighbour's advertised router ID
-     * @param priority the neighbour's advertised priority (MA election)
      * @param ipAddress the neighbour's interface IP address, for unicast messaging
      */
-    public NeighbourNode(IPAddressString rid, int priority, IPAddress ipAddress) {
+    public NeighbourNode(IPAddressString rid, IPAddress ipAddress) {
         super(rid);
-        this.priority = priority;
         this.ipAddress = ipAddress;
         this.rIntOwner = RouterInterface.GetInterfaceByIPNetwork(ipAddress);
-
-        //Neighbour just added to neighbours, init state.
-        SetState(ExternalStates.INIT);
-
-        ResetInactiveTimer();
     }
 
     /**<p><h1>Reset Inactivity</h1></p>
@@ -109,7 +98,7 @@ public class NeighbourNode extends Node {
      * @param newState State to set node to
      */
     void SetState(ExternalStates newState) {
-        System.out.println("Neighbour " + this.GetRID() + " Statechange:  " +
+        Launcher.PrintToUser("Neighbour " + this.GetRID() + " Statechange:  " +
                 this.state.toString() +
                 " -> " +
                 newState.toString());
@@ -128,18 +117,13 @@ public class NeighbourNode extends Node {
 
         this.knownNeighbours.clear();
         this.SetState(ExternalStates.DOWN);
-        System.out.println("Dead timer expired: " + this.GetRID());
-
-        //Close unicast socket for exchange communication
-        if (unicastSocket != null)
-            if (!unicastSocket.isClosed())
-               unicastSocket.close();
+        Launcher.PrintToUser("Dead timer expired: " + this.GetRID());
 
         //Update neighbours on topology change
         if (Launcher.operationMode.equals("standard"))
-            StdDaemon.SendHelloPacket();
-        /*if (Launcher.operationMode.equals("encrypted"))
-            EncDaemon.SendHelloPacket();*/
+            StdDaemon.SendHelloPackets();
+        if (Launcher.operationMode.equals("encrypted"))
+            EncDaemon.SendHelloPackets();
     }
     //endregion
 }

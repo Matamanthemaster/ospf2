@@ -61,6 +61,7 @@ public class RouterInterface {
     public InterfaceType type; //Interface type identifier. Used by code to determine what type of interface it is. Uses enum
     public Boolean isEnabled; //Interface on?
     public long bandwidth; //BW used by default OSPF calculation, derived from interface type in constructor.
+    DHExchange dhExchange;
     //endregion
 
     //region OBJECT METHODS
@@ -82,7 +83,7 @@ public class RouterInterface {
         this.addrIPv4 = ipv4;
         this.addrIPv6 = ipv6;
         this.type = type;
-        this.bandwidth = type.GetBandwidth();
+        this.bandwidth = type.getBandwidth();
         this.isEnabled = enabled;
 
         _RouterInterfaces.add(this);

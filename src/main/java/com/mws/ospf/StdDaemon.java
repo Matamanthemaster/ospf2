@@ -20,12 +20,12 @@ import java.util.*;
  */
 public class StdDaemon {
     //region STATIC PROPERTIES
-    private static MulticastSocket socketHello;
-    private static InetSocketAddress socAddrHello;
-    private static Timer timerHelloSend;
+    static MulticastSocket multicastSocket;
+    static InetSocketAddress multicastSocketAddr;
+    static Timer timerHelloSend;
 
     //Setup thread for hello multicast server
-    private static final Thread threadHelloListen = new Thread(StdDaemon::HelloReceiveThread, "Thread-Hello-Receive");
+    private static final Thread threadHelloListen = new Thread(StdDaemon::MulticastReceiveThread, "Thread-Hello-Receive");
     //endregion
 
     //region STATIC METHODS
@@ -34,22 +34,36 @@ public class StdDaemon {
      * implemented methods to handle communication. Init the normal process flow of OSPF.</p>
      */
     static void Main() {
-        System.out.println("Standard Daemon Program Run");
+        Launcher.PrintToUser("Standard Daemon Program Run");
 
         //Start stat process if conditions set
         if (Stat.endNoAdjacencies != -1)
             Stat.SetupStats();
 
-        //region SET HELLOSOCKET
+        SetupHelloSocket();
+
+        //Create a timer for hello and set it to run instantly. Running the timer schedules further running.
+        timerHelloSend = new Timer();
+        timerHelloSend.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                SendHelloPackets();
+            }
+        }, 0, 10 * 1000);
+
+        threadHelloListen.start();
+    }
+
+    static void SetupHelloSocket() {
         //used for multicasting. Binds the ospf multicast address to all interfaces using this socket.
-        socketHello = null;
+        multicastSocket = null;
         try {
-            socAddrHello = new InetSocketAddress(InetAddress.getByName("224.0.0.5"), 25565);
-            socketHello = new MulticastSocket(socAddrHello.getPort());
-            socketHello.setTimeToLive(1);
+            multicastSocketAddr = new InetSocketAddress(InetAddress.getByName("224.0.0.5"), 25565);
+            multicastSocket = new MulticastSocket(multicastSocketAddr.getPort());
+            multicastSocket.setTimeToLive(1);
 
             for (RouterInterface rInt : Config.thisNode.interfaceList) {
-                socketHello.joinGroup(socAddrHello, rInt.ToNetworkInterface());
+                multicastSocket.joinGroup(multicastSocketAddr, rInt.ToNetworkInterface());
             }
         } catch (UnknownHostException ex) {
             //InetAddress.getByName()
@@ -66,22 +80,8 @@ public class StdDaemon {
         }
 
         //If helloSocket was not correctly set and no exception was gotten, hard exit
-        if (socketHello == null)
+        if (multicastSocket == null)
             DaemonErrorHandle("", null);
-        //endregion SET HELLOSOCKET
-
-        //region SET RECEIVE HANDLER
-        //Create a timer for hello and set it to run instantly. Running the timer schedules further running.
-        timerHelloSend = new Timer();
-        timerHelloSend.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                SendHelloPacket();
-            }
-        }, 0, 10 * 1000);
-
-        threadHelloListen.start();
-        //endregion
     }
 
     /**<p><h1>Send a Hello Packet</h1></p>
@@ -89,28 +89,27 @@ public class StdDaemon {
      * multicast socket to send to each RouterInterface.</p>
      * <p>Can be called individually to send a packet. Also is the TimerTask that executes on timerHelloSend tick</p>
      */
-    static void SendHelloPacket() {
-
-        //Make buffer
-        byte[] helloBuffer = MakeHelloPacket();
+    static void SendHelloPackets() {
 
         //Create a datagram packet to send, send it out all network interfaces.
         try {
-            DatagramPacket helloPacket = new DatagramPacket(helloBuffer, helloBuffer.length, socAddrHello);
+            //Make buffer and datagram packet to send
+            byte[] helloBuffer = MakeHelloPacket();
+            DatagramPacket helloPacket = new DatagramPacket(helloBuffer, helloBuffer.length, multicastSocketAddr);
 
             //send packet to all enabled interfaces.
             for (RouterInterface rInt: Config.thisNode.interfaceList) {
                 if (!rInt.isEnabled)
                     continue;
 
-                socketHello.setNetworkInterface(rInt.ToNetworkInterface());
-                socketHello.send(helloPacket);
+                multicastSocket.setNetworkInterface(rInt.ToNetworkInterface());
+                multicastSocket.send(helloPacket);
             }
         } catch (UnknownHostException ex) {
-            DaemonErrorHandle("Unknown host when creating datagram packet. Java couldn't resolve the host" +
-                    "224.0.0.5 somehow? This shouldn't be possible", ex);
+            DaemonErrorHandle("Std Daemon: Unknown host when creating datagram packet. Java couldn't resolve" +
+                    "the host 224.0.0.5 somehow? This shouldn't be possible", ex);
         } catch (IOException ex) {
-            DaemonErrorHandle("IOException when sending hello datagram packet", ex);
+            DaemonErrorHandle("Std Daemon: IOException when sending hello datagram packet", ex);
         }
     }
 
@@ -120,137 +119,143 @@ public class StdDaemon {
      * <p>Once a packet is received, it is verified, data is scraped from it, and then the data is used in protocol
      * functions and stored in Config.</p>
      */
-    private static void HelloReceiveThread() {
+    private static void MulticastReceiveThread() {
         //Buffer for raw data.
-        byte[] pBytes = new byte[500];
+        byte[] pBytes = new byte[4000];
         DatagramPacket pReturned = new DatagramPacket(pBytes, pBytes.length);
 
         //Only runs if not interrupted. If interrupted thread will end execution. To cancel, interrupt.
         while (!Thread.currentThread().isInterrupted()) {
 
             try {
-                socketHello.receive(pReturned);
+                multicastSocket.receive(pReturned);
             } catch (IOException ex) {
-                DaemonErrorHandle("Exception on CheckHelloBuffer receive", ex);
+                DaemonErrorHandle("Exception on HelloReceiveThread", ex);
             }
 
             //Get value used multiple times, source IP.
             IPAddress pSource = new IPAddressNetwork.IPAddressGenerator().from(pReturned.getAddress());
 
-            //region VERIFY PACKET
-            //Check this node was not the source, and interface is enabled.
-            if (RouterInterface.GetInterfaceByIP(pSource) != null)
-                continue;
-            try {
-                if (!RouterInterface.GetInterfaceByIPNetwork(pSource).isEnabled)
-                    continue;
-            } catch (NullPointerException ex) {
-              DaemonErrorHandle("HelloReceiveThread: Hello packet received on interface not in RouterInterface." +
-                      " This should not happen, as socketHello shouldn't be joined to an interface that has not been" +
-                      " created, and sho a hello packet should not have been received.", ex);
-            }
+            //Treat the packet as valid initially, scrape the length from the packet and use it to truncate the buffer
+            int pLength = Short.toUnsignedInt(Shorts.fromByteArray(Arrays.copyOfRange(pBytes, 2, 4)));
+            byte[] packetBuffer = Arrays.copyOfRange(pReturned.getData(), 0, pLength);
 
-            //verify single byte values, saves adv. processing if basic fields are wrong.
-            //proto version (2)
+            //Only accept packets that are the normal (unencrypted) protocol version (ospfv2)
             if (pBytes[0] != 0x02)
                 continue;
-            //message type (hello)
-            if (pBytes[1] != 0x01)
+
+            //validate the data. If invalid, packetBuffer will be null so skip over current packet (loop).
+            packetBuffer = StdDaemon.ValidateOSPFHeader(packetBuffer, pSource);
+            if (packetBuffer == null)
                 continue;
 
-
-            //Setup new buffer to be of the specified length.
-
-            /*Get Packet length
-            Get bytes from the packet buffer. Starts from 2 inc., to byte 4 exclu. This length is trusted and used
-            for the rest of this handle. Don't need to verify if correct, as checksum will do that based on this
-            length value.*/
-            int pLength = Short.toUnsignedInt(Shorts.fromByteArray(Arrays.copyOfRange(pBytes, 2, 4)));
-            byte[] packetBuffer = Arrays.copyOfRange(pBytes, 0, (pLength));
-
-            //Get checksum. Bytes 12, 13
-            long pChecksum = Short.toUnsignedLong(Shorts.fromByteArray(Arrays.copyOfRange(pBytes, 12, 14)));
-
-            packetBuffer[12] = packetBuffer[13] = 0;//Unset checksum, so checksum calc will be correct.
-
-            //verify checksums. If wrong, print special message. Important for debugging, inform server of line error.
-            if (pChecksum != Launcher.IpChecksum(packetBuffer)) {
-                System.err.println("Hello packet checksum mismatch. Got " + pChecksum + ", expected " +
-                        Launcher.IpChecksum(packetBuffer));
-                continue;
-            }
-            //endregion VERIFY PACKET
-            //int pLength
-            //byte[] packetBuffer
-
-            //region GATHER DATA
+            //region SCRAPE NEIGHBOUR
             //RID in bytes 4,5,6,7 to string. Using IPAddress class to convert bytes to the RID, easy peasy.
-            IPAddress pNeighbourRIDAddr = new IPAddressNetwork.IPAddressGenerator().from(
+            IPAddressString neighbourRID = new IPAddressNetwork.IPAddressGenerator().from(
                     Arrays.copyOfRange(packetBuffer, 4, 8)
-            );
-            IPAddressString neighbourRID = pNeighbourRIDAddr.toAddressString();
-
-            //Known neighbours RIDs.
-            List<IPAddressString> reportedKnownRIDs = new ArrayList<>();
-            if (pLength > 44) {
-                if ((pLength - 44) %4 != 0) {
-                    //Not allowed, number of bytes after should be a multiple of 4 bytes.
-                    System.err.println("Neighbour Node reported adjacent neighbours incorrectly");
-                    continue;
-                }
-
-                //Number of 4 byte pairs after the first 44 hello header bytes.
-                int knownNeighboursListLength = (pLength - 44) / 4;
-
-                //Loop through each 4 bytes after BDR RID, which are all recently known adjacent RIDs.
-                for (int i = 0; i < knownNeighboursListLength; i++) {
-                    int curByteOffset = 44 + (i*4);
-                    reportedKnownRIDs.add(new IPAddressNetwork.IPAddressGenerator().from(
-                            Arrays.copyOfRange(packetBuffer, curByteOffset, curByteOffset+4)
-                    ).toAddressString());
-                }
-            }
-            //endregion GATHER DATA
-
-            //region USE DATA FOR NEIGHBOURS TABLE
-
-            //Lookup node, if not exist create it in the neighbours table
+            ).toAddressString();
             NeighbourNode neighbour = NeighbourNode.GetNeighbourNodeByRID(neighbourRID);
+            //endregion SCRAPE NEIGHBOUR
 
-            if (neighbour == null) {
-                //Treat priority byte as string, parse string -> int
-                int neighbourPriority = Integer.parseUnsignedInt(pBytes[31] + "");
-
-                neighbour = new NeighbourNode(neighbourRID, neighbourPriority, pSource);
-
-                System.out.println("Received packet from new neighbour, with valid checksum. Neighbour ID: " +
-                        neighbour.GetRID());
-
-                Config.neighboursTable.add(neighbour);
-                Config.thisNode.knownNeighbours.add(neighbourRID);
-
-                /*Not in OSPF spec to send a hello packet on Down -> Init state, but allows quicker convergence, not
-                waiting for hello timer to expire*/
-                SendHelloPacket();
+            //Branch, pass to packet processor for each specific packet type.
+            switch (packetBuffer[1]) {
+                //Hello Packet
+                case 0x01 -> ProcessHelloPacket(neighbour, neighbourRID, pSource, packetBuffer);
             }
 
-            neighbour.knownNeighbours = reportedKnownRIDs;//Update knowledge of neighbour nodes
-            neighbour.ResetInactiveTimer();
-            //endregion USE DATA FOR NEIGHBOURS TABLE
-
-            //region SET STATES CORRECTLY
-            if (neighbour.GetState() == ExternalStates.DOWN)
-                neighbour.SetState(ExternalStates.INIT);
-
-            /*If in init state and this neighbour reports to know of this current node, this is the conditions for the
-            2WayReceived event. Trigger it*/
-            if (neighbour.GetState() == ExternalStates.INIT && neighbour.knownNeighbours.contains(Config.thisNode.GetRID()))
-                TwoWayReceivedEvent(neighbour);
-            //endregion SET STATES CORRECTLY
         }
     }
 
-    /**<p><h1>2WayReceived Event</h1></p>
+    static byte[] ValidateOSPFHeader(byte[] packetBuffer, IPAddress pSource) {
+        //region VERIFY PACKET
+        //Check this node was not the source, if so reject the packet by null
+        if (RouterInterface.GetInterfaceByIP(pSource) != null)
+            return null;
+
+        RouterInterface receiveInt = RouterInterface.GetInterfaceByIPNetwork(pSource);
+        if (receiveInt == null) {
+            DaemonErrorHandle("UNLIKELY EXCEPTION: Packet received from interface this node is not in", null);
+            return null;
+        }
+
+        //Reject packets received on interfaces that are not enabled.
+        if (!receiveInt.isEnabled)
+            return null;
+
+        //Get checksum. Bytes 12, 13
+        long pChecksum = Short.toUnsignedLong(Shorts.fromByteArray(Arrays.copyOfRange(packetBuffer, 12, 14)));
+
+        packetBuffer[12] = packetBuffer[13] = 0;//Unset checksum, so checksum calc will be correct.
+
+        //verify checksums. If wrong, print special message. Important for debugging, inform server of line error.
+        if (pChecksum != Launcher.IpChecksum(packetBuffer)) {
+            System.err.println("Packet checksum mismatch. Got " + pChecksum + ", expected " +
+                    Launcher.IpChecksum(packetBuffer));
+            return null;
+        }
+        return packetBuffer;
+    }
+
+    static void ProcessHelloPacket(NeighbourNode neighbour, IPAddressString neighbourRID, IPAddress pSource,
+                                   byte[] packetBuffer) {
+        int pLength = packetBuffer.length;
+
+        //region SCRAPE KNOWN RIDS
+        //Gather known RIDs from the hello packet
+        List<IPAddressString> reportedKnownRIDs = new ArrayList<>();
+        if (pLength > 44) {
+            if ((pLength - 44) %4 != 0) {
+                //Not allowed, number of bytes after should be a multiple of 4 bytes. Ignore packet
+                System.err.println("Neighbour Node reported adjacent neighbours incorrectly");
+                return;
+            }
+
+            //Number of 4 byte pairs after the first 44 hello header bytes.
+            int knownNeighboursListLength = (pLength - 44) / 4;
+
+            //Loop through each 4 bytes after BDR RID, which are all recently known adjacent RIDs.
+            for (int i = 0; i < knownNeighboursListLength; i++) {
+                int curByteOffset = 44 + (i*4);
+                reportedKnownRIDs.add(new IPAddressNetwork.IPAddressGenerator().from(
+                        Arrays.copyOfRange(packetBuffer, curByteOffset, curByteOffset+4)
+                ).toAddressString());
+            }
+        }
+        //endregion SCRAPE KNOWN RIDS
+
+        //Add new neighbour
+        if (neighbour == null) {
+            neighbour = new NeighbourNode(neighbourRID, pSource);
+            Config.neighboursTable.add(neighbour);
+        }
+
+        //Update neighbour parameters only for state change Down -> Init.
+        if (neighbour.GetState() == ExternalStates.DOWN) {
+            //Treat priority byte as string, parse string -> int
+            neighbour.priority = Integer.parseUnsignedInt(packetBuffer[31] + "");
+
+            Config.thisNode.knownNeighbours.add(neighbourRID);
+
+            Launcher.PrintToUser("New Adjacency for node '" + neighbourRID + "'");
+
+            neighbour.SetState(ExternalStates.INIT);
+
+            /*Not in OSPF spec to send a hello packet on Down -> Init state, but allows quicker convergence, not
+            waiting for hello timer to expire*/
+            SendHelloPackets();
+        }
+
+        //Update neighbour parameters for each received hello packet
+        neighbour.knownNeighbours = reportedKnownRIDs;
+        neighbour.ResetInactiveTimer();
+
+        /*If in init state and this neighbour reports to know of this current node, this is the conditions for the
+        2WayReceived event. Trigger it*/
+        if (neighbour.GetState() == ExternalStates.INIT && neighbour.knownNeighbours.contains(Config.thisNode.GetRID()))
+            TwoWayReceivedEvent(neighbour);
+    }
+
+    /**<p><h1>Standard 2WayReceived Event</h1></p>
      * <p>On neighbour state Init, if a node receives a hello packet with its own RID echoed, the event 2WayReceived is
      * fired. This method is the trigger for the exchange protocol to start for the neighbour node.</p>
      * @param neighbourNode node that has had the 2WayReceived event trigger
@@ -266,7 +271,7 @@ public class StdDaemon {
 
         //Current future method
         //Statistics Endpoint test
-        if (Config.thisNode.knownNeighbours.size() >= Stat.endNoAdjacencies && Stat.endNoAdjacencies != -1)
+        if ((Config.thisNode.knownNeighbours.size() >= Stat.endNoAdjacencies) && Stat.endNoAdjacencies != -1)
             Stat.EndStats();
     }
 
@@ -360,7 +365,7 @@ public class StdDaemon {
         //Clean exit
         timerHelloSend.cancel();
         threadHelloListen.interrupt();
-        socketHello.close();
+        multicastSocket.close();
         System.exit(-3);
     }
     //endregion
