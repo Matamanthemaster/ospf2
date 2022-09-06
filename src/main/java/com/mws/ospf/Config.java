@@ -69,7 +69,7 @@ public class Config {
         if (flagFileConfRemove)
             fileConfig.delete();
 
-        if (!getConfigExists()) {
+        if (!isConfigExists()) {
             try {
                 makeConfig();
             } catch (SocketException | UnknownHostException | AddressStringException e) {
@@ -161,7 +161,7 @@ public class Config {
      * properties with data from the config xml document file.</p>
      */
     static void readConfig() {
-        if (!getConfigExists())
+        if (!isConfigExists())
         {
             try {
                 makeConfig();
@@ -251,7 +251,7 @@ public class Config {
      */
     static void writeConfig() {
         try {
-            if (getConfigExists()) {
+            if (isConfigExists()) {
                 fileConfig.delete();
                 fileConfig.createNewFile();
             }
@@ -276,7 +276,7 @@ public class Config {
 
             //setup nid element. Set nid text content to the stored config.
             Element configRID = getConfigElementFromRoot(confDoc, confRoot, "RID");
-            configRID.setTextContent(String.valueOf(thisNode.GetRID()));
+            configRID.setTextContent(String.valueOf(thisNode.getRID()));
 
             //Create interfaces root.
             Element confInterfacesRoot = getConfigElementFromRoot(confDoc, confRoot, "interfaces");
@@ -285,7 +285,7 @@ public class Config {
             for (RouterInterface curRInt: thisNode.interfaceList)
             {
                 //Current interface element (e.g. <enp5s0></enp5s0>)
-                Element confCurRInt = getConfigElementFromRoot(confDoc, confInterfacesRoot, curRInt.GetName());
+                Element confCurRInt = getConfigElementFromRoot(confDoc, confInterfacesRoot, curRInt.getName());
 
                 //IPv4 Address (e.g. 192.168.1.20/24)
                 Element confCurRIntIPv4 = getConfigElementFromRoot(confDoc, confCurRInt, "IPv4");
@@ -350,7 +350,7 @@ public class Config {
      * <p>Determine the status of the config file</p>
      * @return true if the file is set in the config and exists
      */
-    static boolean getConfigExists() {
+    static boolean isConfigExists() {
         if (fileConfig == null)
         {
             return false;

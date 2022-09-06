@@ -13,6 +13,7 @@ import java.util.*;
  * perform the collection activities at a set interval. At the </p>
  */
 public class Stat {
+    //region STATIC PROPERTIES
     static File fileStats =  new File(System.getProperty("user.dir") + System.getProperty("file.separator") + "ospf.stat.csv");
     private static long tsStart;
     private static long tsConvergence;
@@ -23,22 +24,25 @@ public class Stat {
     private static OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     static int endNoAdjacencies = -1;
 
+    //endregion STATIC PROPERTIES
+
+    //region STATIC METHODS
     /**<p><h1>Setup Statistic Gathering</h1></p>
      * <p>Records the first set of statistics as a base point, especially for timings. Also starts the statistics timer
      * scheduled to record periodically. The statistic poll time is a static value in code.</p>
      */
-    public static void SetupStats() {
+    public static void setupStats() {
         //Change poleIntervalMs to change how frequently resource stats are polled
         int pollIntervalMs = 10;
         System.out.println("STATS: Statistics collection started");
         tsStart = System.nanoTime();
-        _RecordStat(tsStart);
+        recordStat(tsStart);
 
         //Setup timer, delay and interval of pollIntervalMs. Every tick, call _RecordStat with the current nanotime.
         timerStatUpdate.schedule(new TimerTask() {
             @Override
             public void run() {
-                _RecordStat(System.nanoTime());
+                recordStat(System.nanoTime());
             }
         }, pollIntervalMs, pollIntervalMs);
     }
@@ -47,10 +51,10 @@ public class Stat {
      * <p>Call at the end of processing, when endNoAdjacencies condition has been met. Records a final statistic, and
      * works towards saving all data. Creates the stats csv file fileStats, and populates it with experimental data</p>
      */
-    public static void EndStats() {
+    public static void endStats() {
         //get endpoint of statistics
         tsConvergence = System.nanoTime();
-        _RecordStat(tsConvergence);
+        recordStat(tsConvergence);
 
         //Stop new statistics being recorded
         timerStatUpdate.cancel();
@@ -98,11 +102,12 @@ public class Stat {
      * <p>Stores the timestamp, CPU time and memory usage</p>
      * @param timestamp System.nanoTime() at the time of recording statistics. Index in storage for statistics
      */
-    private static void _RecordStat(long timestamp) {
+    private static void recordStat(long timestamp) {
         int curStatIndex = mapListTime.size();
         cpuTime.add(curStatIndex, (osBean.getProcessCpuTime() / 1000000));// div by 1000000 to convert to MS, more accurate to scale of returned value
         mapListTime.put(timestamp, curStatIndex);
         Runtime runtime = Runtime.getRuntime();
         memUsage.add(curStatIndex, runtime.totalMemory() - runtime.freeMemory());
     }
+    //endregion STATIC METHODS
 }

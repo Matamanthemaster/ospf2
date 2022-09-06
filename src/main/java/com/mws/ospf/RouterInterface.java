@@ -27,7 +27,7 @@ public class RouterInterface {
      * @param ip an IP address to search for
      * @return First RouterInterface associated with the IP, or null
      */
-    public static RouterInterface GetInterfaceByIP(IPAddress ip) {
+    public static RouterInterface getInterfaceByIP(IPAddress ip) {
         for(RouterInterface r: _RouterInterfaces) {
             if (r.addrIPv4.toIPv4().equals(ip.toIPv4()))
                 return r;
@@ -44,7 +44,7 @@ public class RouterInterface {
      * @param ip ip address to check against all interfaces for a match in network address
      * @return a router interface object that shares the same network address as ip
      */
-    public static RouterInterface GetInterfaceByIPNetwork(IPAddress ip) {
+    public static RouterInterface getInterfaceByIPNetwork(IPAddress ip) {
         for (RouterInterface r: _RouterInterfaces) {
             if (r.isAddressInNetwork(ip)) {
                 return r;
@@ -65,7 +65,7 @@ public class RouterInterface {
     //endregion
 
     //region OBJECT METHODS
-    /**<p><h1>RouterInterface Constructor</h1></p>
+    /**<p><h1>RouterInterface</h1></p>
      * <p>Construct a router interface object with specified parameters.</p>
      * <p>A storage class for interface parameters. Stores IP addresses as classes that can store prefixes, and general parameters.</p>
      * @param name the name of the interface. Cisco e.g. GigabitEthernet0/0/0. Linux e.g. eth0 or enp5s0
@@ -95,7 +95,7 @@ public class RouterInterface {
      * <p>Getter for the RouterInterface name property</p>
      * @return interface name
      */
-    public String GetName() {
+    public String getName() {
         return name;
     }
 
@@ -105,7 +105,7 @@ public class RouterInterface {
      * @return NetworkInterface object for the interface.
      * @throws SocketException if an I/O error occurs
      */
-    public NetworkInterface ToNetworkInterface() throws SocketException {
+    public NetworkInterface toNetworkInterface() throws SocketException {
         return NetworkInterface.getByName(this.name);
     }
 
@@ -123,7 +123,7 @@ public class RouterInterface {
     /**<p><h1>Print Properties Test</h1></p>
      * <p>Testing method to be thrown into constructor.</p>
      */
-    private void PrintAllValuesToSTDOut() {
+    private void printAllValuesToSTDOut() {
         System.out.println(this.name);
         System.out.println("    " + this.addrIPv4.toString());
         for (IPAddress a: this.addrIPv6) {

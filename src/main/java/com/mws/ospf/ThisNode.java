@@ -15,7 +15,7 @@ public class ThisNode extends Node {
     //endregion
 
     //region OBJECT METHODS
-    /**<p><h1>This Node Constructor</h1></p>
+    /**<p><h1>This Node</h1></p>
      * <p>Construct a This Node object with the specified RID, hostname and list of router interfaces</p>
      * @param rid Router ID of this node
      * @param hostname Hostname of this node

@@ -23,16 +23,17 @@ public class UIEntry extends Application {
     /**<p><h1>UI Entry Start</h1></p>
      * <p>JavaFX method to set up a scene within a stage, under programmer control. Sets up the JavaFx Stage, and the
      * scene (content) of the stage from a fxml file.</p>
-     * @param primaryStage
-     * @throws IOException
+     * @param primaryStage stage passed by JavaFX methods, derived from compositor
+     * @throws IOException on loading fxml document from FXML Loader
      */
     @Override
     public void start(Stage primaryStage) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(UIEntry.class.getResource("controlUI.fxml"));
         Scene scene = new Scene(fxmlLoader.load(), 320, 240);
-        primaryStage.setTitle("");
+        primaryStage.setTitle("[OSPFv" + (Launcher.operationMode.equals("standard") ? "2":"4") +
+                "@" + Config.thisNode.hostname+ "]");
         primaryStage.setScene(scene);
         primaryStage.show();
-        primaryStage.setOnCloseRequest(UIController::OnClose);
+        primaryStage.setOnCloseRequest(UIController::onClose);
     }
 }

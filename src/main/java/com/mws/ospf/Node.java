@@ -25,7 +25,7 @@ public abstract class Node {
      * @throws NumberFormatException rid provided cannot be parsed into a number (contains illegal characters)
      */
     public Node(IPAddressString rid) {
-        SetRID(rid);
+        setRID(rid);
     }
 
     /**<p><h1>Set Router ID</h1></p>
@@ -36,7 +36,7 @@ public abstract class Node {
      * @throws IllegalArgumentException rid provided is not a 4 character string or is equal to 0.0.0.0
      * @throws NumberFormatException rid provided cannot be parsed into a number (contains illegal characters)
      */
-    public void SetRID(IPAddressString rid) {
+    public void setRID(IPAddressString rid) {
         if (!rid.isValid())
             throw new IllegalArgumentException("RID isn't valid");
         if (!rid.isIPv4())
@@ -55,7 +55,7 @@ public abstract class Node {
      * <p>Return the Router ID as stored string</p>
      * @return The node's router ID
      */
-    public IPAddressString GetRID() {
+    public IPAddressString getRID() {
         return this.rid;
     }
 
@@ -64,7 +64,7 @@ public abstract class Node {
      * string is returned</p>
      * @return List of known neighbours, as comma separated list.
      */
-    public String GetKnownNeighboursString() {
+    public String getKnownNeighboursString() {
         if (knownNeighbours.size() == 0)
             return "";
 
@@ -82,7 +82,7 @@ public abstract class Node {
      * @return 4 byte array of the Router ID in Big Endian format
      * @throws NumberFormatException if the node rid is not a number.
      */
-    public byte[] GetRIDBytes() {
+    public byte[] getRIDBytes() {
         return rid.getAddress().getBytes();
     }
     //endregion

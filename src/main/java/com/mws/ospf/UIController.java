@@ -27,9 +27,9 @@ public class UIController {
     //@FXML private Label lblDispRID;
     @FXML private TextField txtRID;
     @FXML private TabPane tbpNeighbours;
-    private Timeline timerUpdateGUI = new Timeline(
+    private final Timeline timerUpdateGUI = new Timeline(
             new KeyFrame(Duration.seconds(1),
-                    event -> UpdateTimerTick(event)));
+                    this::updateTimerTick));
     //endregion OBJECT PROPERTIES
 
     //region STATIC METHODS
@@ -37,7 +37,7 @@ public class UIController {
      * <p>Static event triggered on window close. Set up as event in UIEntry.start method</p>
      * @param ev event parameters
      */
-    static void OnClose(WindowEvent ev){
+    static void onClose(WindowEvent ev){
         System.exit(0);
     }
     //endregion STATIC METHODS
@@ -48,7 +48,7 @@ public class UIController {
      */
     @FXML
     protected void initialize() {
-        txtRID.setText(String.valueOf(Config.thisNode.GetRID()));
+        txtRID.setText(String.valueOf(Config.thisNode.getRID()));
         tbpNeighbours.getTabs().clear();
         timerUpdateGUI.setCycleCount(Timeline.INDEFINITE);
         timerUpdateGUI.play();
@@ -59,15 +59,15 @@ public class UIController {
      * @param ev Key event parameters
      */
     @FXML
-    protected void TxtRIDKeyPressed(KeyEvent ev) {
+    protected void txtRIDKeyPressed(KeyEvent ev) {
         //On Key enter, update RID
         if (ev.getCode() == KeyCode.ENTER) {
             try {
-                Config.thisNode.SetRID(new IPAddressString(txtRID.getText()));
+                Config.thisNode.setRID(new IPAddressString(txtRID.getText()));
                 Config.writeConfig();
             } catch (IllegalArgumentException ex) {
                 lblOutStatus.setText("RID was invalid, reverted to default value");
-                txtRID.setText(Config.thisNode.GetRID().toString());
+                txtRID.setText(Config.thisNode.getRID().toString());
             }
         }
     }
@@ -76,17 +76,17 @@ public class UIController {
      * <p>Called when the update timeline fires, updating the UI elements every second</p>
      * @param ev event parameters
      */
-    private void UpdateTimerTick(ActionEvent ev) {
+    private void updateTimerTick(ActionEvent ev) {
         for (NeighbourNode n : Config.neighboursTable) {
             if (!tbpNeighbours.getTabs().contains(n.tab)) {
-                AddGUINeighbour(n);
+                addGUINeighbour(n);
             }
 
             VBox vbTabPropValues = (VBox) ((HBox) n.tab.getContent()).getChildren().get(1);
-            ((Label) vbTabPropValues.getChildren().get(0)).setText(n.GetRID().toString());
+            ((Label) vbTabPropValues.getChildren().get(0)).setText(n.getRID().toString());
             ((Label) vbTabPropValues.getChildren().get(1)).setText(n.ipAddress.toPrefixLengthString());
-            ((Label) vbTabPropValues.getChildren().get(2)).setText(n.GetState().toString());
-            ((Label) vbTabPropValues.getChildren().get(3)).setText(n.GetKnownNeighboursString());
+            ((Label) vbTabPropValues.getChildren().get(2)).setText(n.getState().toString());
+            ((Label) vbTabPropValues.getChildren().get(3)).setText(n.getKnownNeighboursString());
         }
 
 
@@ -97,7 +97,7 @@ public class UIController {
      * elements, and populate initial values</p>
      * @param n Neighbour node being added to the UI.
      */
-    private void AddGUINeighbour(NeighbourNode n) {
+    private void addGUINeighbour(NeighbourNode n) {
         HBox hbTabRoot = new HBox();
         VBox vbTabPropNames = new VBox();
         VBox vbTabPropValues = new VBox();
@@ -105,19 +105,19 @@ public class UIController {
         hbTabRoot.getChildren().add(1, vbTabPropValues);
 
         vbTabPropNames.getChildren().add(0, new Label("RID: "));
-        vbTabPropValues.getChildren().add(0, new Label(n.GetRID().toString()));
+        vbTabPropValues.getChildren().add(0, new Label(n.getRID().toString()));
 
         vbTabPropNames.getChildren().add(1, new Label("IPv4: "));
         vbTabPropValues.getChildren().add(1, new Label(n.ipAddress.toPrefixLengthString()));
 
         vbTabPropNames.getChildren().add(2, new Label("State: "));
-        vbTabPropValues.getChildren().add(2, new Label(n.GetState().toString()));
+        vbTabPropValues.getChildren().add(2, new Label(n.getState().toString()));
 
         vbTabPropNames.getChildren().add(3, new Label("Known Neighbours: "));
-        vbTabPropValues.getChildren().add(3, new Label(n.GetKnownNeighboursString()));
+        vbTabPropValues.getChildren().add(3, new Label(n.getKnownNeighboursString()));
 
         n.tab = new Tab();
-        n.tab.setText(n.GetRID().toString());
+        n.tab.setText(n.getRID().toString());
         n.tab.setContent(hbTabRoot);
 
         tbpNeighbours.getTabs().add(n.tab);

@@ -21,9 +21,9 @@ public class NeighbourNode extends Node {
      * @param rid Router ID to use as an index
      * @return Related instance of neighbour node
      */
-    public static NeighbourNode GetNeighbourNodeByRID(IPAddressString rid) {
+    public static NeighbourNode getNeighbourNodeByRID(IPAddressString rid) {
         for (NeighbourNode n : Config.neighboursTable) {
-            if (n.GetRID().equals(rid)) {
+            if (n.getRID().equals(rid)) {
                 return n;
             }
         }
@@ -36,7 +36,7 @@ public class NeighbourNode extends Node {
      * @return true if it exists, false if not
      */
     public static boolean isNeighbourNodeExists(IPAddressString rid) {
-        return GetNeighbourNodeByRID(rid) != null;
+        return getNeighbourNodeByRID(rid) != null;
     }
     //endregion
 
@@ -62,23 +62,23 @@ public class NeighbourNode extends Node {
     public NeighbourNode(IPAddressString rid, IPAddress ipAddress) {
         super(rid);
         this.ipAddress = ipAddress;
-        this.rIntOwner = RouterInterface.GetInterfaceByIPNetwork(ipAddress);
+        this.rIntOwner = RouterInterface.getInterfaceByIPNetwork(ipAddress);
     }
 
     /**<p><h1>Reset Inactivity</h1></p>
      * <p>Refreshes the activity timer on this neighbour. Clears any existing inactivity timer already running and
      * schedules a new timer with the delay of the inactivity timer</p>
      */
-    void ResetInactiveTimer() {
+    void resetInactiveTimer() {
         if (flagTimerInactRunning) {
             timerInactivity.cancel();
         }
 
-        timerInactivity = new Timer(this.GetRID() + "-DeadTimer");
+        timerInactivity = new Timer(this.getRID() + "-DeadTimer");
         timerInactivity.schedule(new TimerTask() {
             @Override
             public void run() {
-                TimerExpire();
+                expireDeadTimer();
             }
         }, 40*1000);
 
@@ -89,7 +89,7 @@ public class NeighbourNode extends Node {
      * <p>Getter for neighbour node state</p>
      * @return the ExternalState of the node
      */
-    public ExternalStates GetState() {
+    public ExternalStates getState() {
         return this.state;
     }
 
@@ -97,8 +97,8 @@ public class NeighbourNode extends Node {
      * <p>Set the neighbour node to a specified state</p>
      * @param newState State to set node to
      */
-    void SetState(ExternalStates newState) {
-        Launcher.PrintToUser("Neighbour " + this.GetRID() + " Statechange:  " +
+    void setState(ExternalStates newState) {
+        Launcher.printToUser("Neighbour " + this.getRID() + " Statechange:  " +
                 this.state.toString() +
                 " -> " +
                 newState.toString());
@@ -109,21 +109,21 @@ public class NeighbourNode extends Node {
     /**<p><h1>Dead Timer Expire</h1></p>
      * <p>Trigger on expiring the inactive timer. Sets the neighbour node to the down state, resetting variables</p>
      */
-    private void TimerExpire() {
+    private void expireDeadTimer() {
 
         try {
             timerInactivity.cancel();
         } catch (IllegalStateException ignored) {}//IllegalStateException: Timer already cancelled.
 
         this.knownNeighbours.clear();
-        this.SetState(ExternalStates.DOWN);
-        Launcher.PrintToUser("Dead timer expired: " + this.GetRID());
+        this.setState(ExternalStates.DOWN);
+        Launcher.printToUser("Dead timer expired: " + this.getRID());
 
         //Update neighbours on topology change
         if (Launcher.operationMode.equals("standard"))
-            StdDaemon.SendHelloPackets();
+            StdDaemon.sendHelloPackets();
         if (Launcher.operationMode.equals("encrypted"))
-            EncDaemon.SendHelloPackets();
+            EncDaemon.sendHelloPackets();
     }
     //endregion
 }
