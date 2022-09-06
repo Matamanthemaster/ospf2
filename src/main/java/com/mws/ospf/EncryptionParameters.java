@@ -10,71 +10,104 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
-import static com.mws.ospf.StdDaemon.DaemonErrorHandle;
+import static com.mws.ospf.StdDaemon.handleDaemonError;
 
+/**<p><h1>Encryption Parameters</h1></p>
+ * <p>Class to store a secret key derived from Diffie-Hellman. Provides methods to use the key in encryption and
+ * decryption of byte buffers, for each individual NeighbourNode.</p>
+ */
 public class EncryptionParameters {
+    //region OBJECT PROPERTIES
     private final SecretKey sharedSecret;
+    //endregion OBJECT PROPERTIES
 
+    //region OBJECT METHODS
+    /**<p><h1>Encryption Parameters</h1></p>
+     * <p>Constructs an encryption parameters object with the specified SecretKey. The key is locked down, being private
+     * and final, only exposed to class methods.</p>
+     * @param aesKey the shared AES secret
+     */
     public EncryptionParameters(SecretKey aesKey) {
         this.sharedSecret = aesKey;
     }
 
-    byte[] Encrypt(byte[] data) {
+    /**<p><h1>Encrypt Data with Key</h1></p>
+     * <p>Method converts cleartext to AES ciphertext, using a key and a generated IV parameter.</p>
+     * <p>The method handles its own exceptions.</p>
+     * @param data data to be encrypted with the AES secret key
+     * @return the original data encrypted with AES and the secret key. Appended in the first 18 bytes is also the IV
+     * parameter for decrypting the message
+     */
+    byte[] encrypt(byte[] data) {
         try {
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             cipher.init(Cipher.ENCRYPT_MODE, sharedSecret);
 
             byte[] aesParams = cipher.getParameters().getEncoded();
-            Launcher.PrintBuffer(aesParams);
             byte[] ciphertext = cipher.doFinal(data);
             return Bytes.concat(aesParams, ciphertext);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException ex) {
             // Ex on code:  Cipher.getInstance("AES/CBC/PKCS5Padding");
-            StdDaemon.DaemonErrorHandle("UNLIKELY EXCEPTION: Encryption: NoSuchAlgorithm / NoSuchPadding  \"AES/CBC/PKCS5Padding\"", ex);
+            StdDaemon.handleDaemonError("UNLIKELY EXCEPTION: Encryption: NoSuchAlgorithm / NoSuchPadding  \"AES/CBC/PKCS5Padding\"", ex);
         } catch (InvalidKeyException ex) {
             // Ex on code:  cipherEncrypt.init(Cipher.ENCRYPT_MODE, aesKey);
-            StdDaemon.DaemonErrorHandle("Encryption: Invalid Key provided to cipher", ex);
+            StdDaemon.handleDaemonError("Encryption: Invalid Key provided to cipher", ex);
         } catch (IllegalBlockSizeException | BadPaddingException ex) {
             //Data encrypting is bad.
-            StdDaemon.DaemonErrorHandle("Encryption: Illegal block size or bad padding", ex);
+            StdDaemon.handleDaemonError("Encryption: Illegal block size or bad padding", ex);
         } catch (IOException ex) {
             // Ex on code:  cipher.getParameters().getEncoded();
-            StdDaemon.DaemonErrorHandle("Encryption: Exception on encoding AES parameters", ex);
+            StdDaemon.handleDaemonError("Encryption: Exception on encoding AES parameters", ex);
+        } catch (Exception ex) {
+            StdDaemon.handleDaemonError("Encryption: Unexpected Exception", ex);
         }
         //Return null as the compiler can't see error handle calls exit.
         return null;
     }
 
-    byte[] Decrypt(byte[] data) {
-        //TODO: Test encrypt and decrypt.
+    /**<p><h1>Decrypt Data with Key</h1></p>
+     * <p>Method converts AES ciphertext to plaintext, using a key. The method expects the standard OSPF header, and the
+     * first 18 bits to include an encoded IV parameter, from the encryption method of the neighbour node, to point at
+     * where to start decryption.</p>
+     * <p>The method handles its own exceptions.</p>
+     * @param data data + IV parameters to be decrypted with the AES secret key
+     * @return the original data decrypted, with standard OSPF header and trailing decrypted data
+     */
+    byte[] decrypt(byte[] data) {
         try {
             AlgorithmParameters aesParams = AlgorithmParameters.getInstance("AES");
-            aesParams.init(Arrays.copyOfRange(data, 0, 16));
-
-            data = Arrays.copyOfRange(data, 16, data.length);
+            //Split data into predefined blocks of data. Blocks include OSPF header, IV params and encrypted data
+            //0-23 (24 bytes) inclusive, header. 24-41 (18 bytes) inclusive, IV params. 42-end, encrypted data.
+            byte[] ospfHeader = Arrays.copyOfRange(data, 0, 24);
+            aesParams.init(Arrays.copyOfRange(data, 24, 42));
+            byte[] encryptedData = Arrays.copyOfRange(data, 42, data.length);
 
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             cipher.init(Cipher.DECRYPT_MODE, sharedSecret, aesParams);
 
-            return cipher.doFinal(data);
+            //return buffer as if no encryption took place.
+            return Bytes.concat(ospfHeader, cipher.doFinal(encryptedData));
         } catch (NoSuchAlgorithmException ex) {
             // Ex on code:  AlgorithmParameters.getInstance("AES");
             // Ex on code:  Cipher.getInstance("AES/CBC/PKCS5Padding");
-            DaemonErrorHandle("UNLIKELY EXCEPTION: Decryption: NoSuchAlgorithm \"AES\"", ex);
+            handleDaemonError("UNLIKELY EXCEPTION: Decryption: NoSuchAlgorithm \"AES\"", ex);
         } catch (NoSuchPaddingException ex) {
             // Ex on code:  Cipher.getInstance("AES/CBC/PKCS5Padding");
-            DaemonErrorHandle("UNLIKELY EXCEPTION: Decryption: NoSuchPadding \"PKCS5Padding\"", ex);
+            handleDaemonError("UNLIKELY EXCEPTION: Decryption: NoSuchPadding \"PKCS5Padding\"", ex);
         } catch (IllegalBlockSizeException | BadPaddingException ex) {
             // Ex on code:  cipherDecrypt.doFinal(data);
-            DaemonErrorHandle("Decryption: Illegal block size or bad padding when decrypting buffer", ex);
+            handleDaemonError("Decryption: Illegal block size or bad padding when decrypting buffer", ex);
         } catch (IOException ex) {
-            // Ex on ocde:  aesParams.init()
-            StdDaemon.DaemonErrorHandle("Decryption: Exception on decoding AES parameters", ex);
+            // Ex on code:  aesParams.init()
+            StdDaemon.handleDaemonError("Decryption: Exception on decoding AES parameters", ex);
         } catch (InvalidAlgorithmParameterException | InvalidKeyException ex) {
-            // Ex on code:  ipher.init()
-            StdDaemon.DaemonErrorHandle("Decryption: init cipher", ex);
+            // Ex on code:  cipher.init()
+            StdDaemon.handleDaemonError("Decryption: init cipher", ex);
+        } catch (Exception ex) {
+            StdDaemon.handleDaemonError("Decryption: Unexpected Exception", ex);
         }
         //Return null as the compiler can't see error handle calls exit.
         return null;
     }
+    //endregion OBJECT METHODS
 }

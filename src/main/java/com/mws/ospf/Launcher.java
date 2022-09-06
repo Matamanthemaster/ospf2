@@ -46,23 +46,23 @@ public class Launcher {
 
         //Check args if they exist
         if (args.length > 0)
-            SearchFlags(args);
+            searchFlags(args);
 
         //Setup config if it wasn't made from args.
-        if (!Config.getConfigExists())
+        if (!Config.isConfigExists())
             Config.setConfig();
 
         //Entry point for CLI daemon.
         if (operationMode == null)
-            LauncherErrorHandle("Operation mode not specified.");
+            handleLauncherError("Operation mode not specified.");
 
         //Check operation mode from flags, choose appropriate implementation for the PF model.
         if (operationMode.equals("standard"))
-            daemonThread = new Thread(StdDaemon::Main, "Thread-Daemon-StandardOSPF");
+            daemonThread = new Thread(StdDaemon::main, "Thread-Daemon-StandardOSPF");
         else if (operationMode.equals("encrypted"))
-            daemonThread = new Thread(EncDaemon::Main, "Thread-Daemon-EncryptedOSPF");
+            daemonThread = new Thread(EncDaemon::main, "Thread-Daemon-EncryptedOSPF");
         else
-            LauncherErrorHandle("Could not create a daemon thread. Launcher.operationMode is null.");
+            handleLauncherError("Could not create a daemon thread. Launcher.operationMode is null.");
 
         //If the wait logic doesn't apply to this program run, start the chosen daemon thread as usual.
         if (!flagWait && !flagStart) {
@@ -72,7 +72,7 @@ public class Launcher {
 
         //region WAIT LOGIC
         if (flagWait & flagStart)
-            LauncherErrorHandle("wait and start-exp flags cannot be both set");
+            handleLauncherError("wait and start-exp flags cannot be both set");
 
         //Set up epoch time for execution. On wait node, this will just be overridden. On send node, will be sent
         //to connected nodes, and used to synchronise with them. This logic is all oneshot.
@@ -93,7 +93,7 @@ public class Launcher {
             //if sending, send the packet. If waiting, block the thread with receive, then get the epoch timestamp
             //sent, convert it to a long for use later.
             if (flagStart) {
-                PrintToUser("Wait: Sending start epoch");
+                printToUser("Wait: Sending start epoch");
                 for (RouterInterface r: Config.thisNode.interfaceList) {
                     //skip over enabled interfaces, mainly want to send to the NAT bridge interface, to all nodes.
                     //Does not really matter, all nodes will get the packets anyway.
@@ -101,24 +101,24 @@ public class Launcher {
                         continue;
 
                     packetWait.setAddress(r.addrIPv4.toMaxHost().toInetAddress());
-                    socketExperimentWait.setNetworkInterface(r.ToNetworkInterface());
+                    socketExperimentWait.setNetworkInterface(r.toNetworkInterface());
                     socketExperimentWait.send(packetWait);
                 }
             } else {
-                PrintToUser("Wait: Waiting for start epoch");
+                printToUser("Wait: Waiting for start epoch");
                 socketExperimentWait.receive(packetWait);
                 String epochString = new String(packetWait.getData(), StandardCharsets.UTF_8);
                 startTimeEpoch = Long.parseLong(epochString);
-                PrintToUser("Wait: Epoch received from " + packetWait.getAddress().toString() + ": " + epochString);
+                printToUser("Wait: Epoch received from " + packetWait.getAddress().toString() + ": " + epochString);
             }
         } catch (SocketException ex) {
-            LauncherErrorHandle("Socket exception when setting up wait socket. " + ex.getMessage());
+            handleLauncherError("Socket exception when setting up wait socket. " + ex.getMessage());
         } catch (UnknownHostException ex) {
-            LauncherErrorHandle("Could not get IP address 255.255.255.255. Not likely to occur in runtime.");
+            handleLauncherError("Could not get IP address 255.255.255.255. Not likely to occur in runtime.");
         } catch (IOException ex) {
-            LauncherErrorHandle("IOException when sending or receiving a datagram packet.");
+            handleLauncherError("IOException when sending or receiving a datagram packet.");
         } catch (NumberFormatException ex) {
-            LauncherErrorHandle("Exception: Could not convert received data from sending node to an epoch long.");
+            handleLauncherError("Exception: Could not convert received data from sending node to an epoch long.");
         }
 
         //Packets have been sent or received. For each node, now set a oneshot timer based on the epoch start time.
@@ -137,19 +137,19 @@ public class Launcher {
      * <p>Method looks through each argument provided to the program, and runs actions on hitting specific flags</p>
      * @param args the program args to search through
      */
-    private static void SearchFlags(String[] args) {
+    private static void searchFlags(String[] args) {
         //for (args: arg)
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--Standard-OSPF" -> {
                     if (!(operationMode == null))
-                        LauncherErrorHandle("Cannot use multiple operation modes");
+                        handleLauncherError("Cannot use multiple operation modes");
 
                     operationMode = "standard";
                 }
                 case "--Encrypted-OSPF" -> {
                     if (!(operationMode == null))
-                        LauncherErrorHandle("Cannot use multiple operation modes");
+                        handleLauncherError("Cannot use multiple operation modes");
 
                     operationMode = "encrypted";
                 }
@@ -162,7 +162,7 @@ public class Launcher {
                     try {
                         Config.setConfig(args[i+1]);
                     } catch (ArrayIndexOutOfBoundsException ex) {
-                        LauncherErrorHandle("Path for the --config-file flag was missing");
+                        handleLauncherError("Path for the --config-file flag was missing");
                     }
                     i++;
                 }
@@ -172,7 +172,7 @@ public class Launcher {
                     try {
                         Stat.fileStats = new File(args[i+1]);
                     } catch (NullPointerException | ArrayIndexOutOfBoundsException ex) {
-                        LauncherErrorHandle("Path for the --stats-file flag was invalid or missing");
+                        handleLauncherError("Path for the --stats-file flag was invalid or missing");
                     }
                     i++;
                 }
@@ -180,12 +180,12 @@ public class Launcher {
                     try {
                         Stat.endNoAdjacencies = Integer.parseInt(args[i+1]);
                     } catch (NumberFormatException | ArrayIndexOutOfBoundsException ex) {
-                        LauncherErrorHandle("the number of adjacencies for the --adjacency-no flag was either missing or not an integer");
+                        handleLauncherError("the number of adjacencies for the --adjacency-no flag was either missing or not an integer");
                     }
                     i++;
                 }
                 case "--remove-config" -> Config.flagFileConfRemove = true;//Argument useful for testing, will remove the config file.
-                default -> LauncherErrorHandle("Argument not recognised: '" + args[i] + "'.");//Arg not found. Invalid use of program.
+                default -> handleLauncherError("Argument not recognised: '" + args[i] + "'.");//Arg not found. Invalid use of program.
             }
         }
     }
@@ -198,7 +198,7 @@ public class Launcher {
      * @param buffer buffer to calculate the checksum on
      * @return the internet checksum, as a long (8 bytes)
      */
-    public static long IpChecksum(byte[] buffer) {
+    public static long ipChecksum(byte[] buffer) {
         int length = buffer.length;
         int i = 0;
         long sum = 0;
@@ -216,7 +216,7 @@ public class Launcher {
      * <p>Debug method, print a buffer (e.g. from neighbour) to stdout, formatted as hex, each byte separated by space</p>
      * @param buffer Buffer to print to stdout
      */
-    public static void PrintBuffer(byte[] buffer) {
+    public static void printBuffer(byte[] buffer) {
         System.out.print("Buffer[" + buffer.length + "]: ");
         for (byte b: buffer)
         {
@@ -225,7 +225,13 @@ public class Launcher {
         System.out.println();
     }
 
-    static void PrintToUser(String message) {
+    /**<p><h1>Print to User</h1></p>
+     * <p>Print a message to the user. The message is manipulated to add a prompt style front tag.</p>
+     * <p>The method exists to allow further processing of the message in the future, and differentiate with standard
+     * debugging and error messages.</p>
+     * @param message message to be displayed
+     */
+    static void printToUser(String message) {
         System.out.print("[OSPFv" + (operationMode.equals("standard") ? "2":"4"));
         System.out.print("@" + Config.thisNode.hostname + "]: ");
         System.out.println(message);
@@ -236,7 +242,7 @@ public class Launcher {
      * <p>Because the error is in the launch process, specify the command usage</p>
      * @param message message to display to the end user, to indicate what the issue was
      */
-    private static void LauncherErrorHandle(String message) {
+    private static void handleLauncherError(String message) {
         System.err.println(message);
         System.out.println(commandUsage);
         System.exit(-1);

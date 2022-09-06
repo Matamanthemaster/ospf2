@@ -6,11 +6,11 @@ import com.mws.ospf.pdt.ExternalStates;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressNetwork;
 import inet.ipaddr.IPAddressString;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.util.*;
 
 import static com.mws.ospf.StdDaemon.*;
@@ -19,22 +19,29 @@ import static com.mws.ospf.StdDaemon.*;
 
 /**<p><h1>Encryption Daemon</h1></p>
  * <p>Class contains methods that are executed when the application is in encrypted daemon mode. Behaviour of
- * application process flow is controlled by this class</p>
- * <p>This class is the antithesis of StdDaemon</p>
+ * application process flow is controlled by this class. It uses several methods and properties from the StdDaemon,
+ * while providing opposite functionality.</p>
  */
-public class EncDaemon{
+public class EncDaemon {
     //region STATIC PROPERTIES
+    private static final Thread threadDHHelloListen = new Thread(EncDaemon::receiveMulticastThread,
+            "Thread-DHHello-Receive");
     //endregion
-    private static final Thread threadDHHelloListen = new Thread(EncDaemon::MulticastReceiveThread, "Thread-DHHello-Receive");
+
     //region STATIC METHODS
-    public static void Main() {
-        Launcher.PrintToUser("Encrypted Daemon Program Run");
+    /**<p><h1>EncDaemon Main Method</h1></p>
+     * <p>Entrypoint into the EncDaemon. Sets up the hello protocol behaviour to allow nodes to start working with
+     * implemented methods to handle communication. Init the encrypted process flow of new OSPF.</p>
+     * <p>Utilises the same socket as the StdDaemon.</p>
+     */
+    public static void main() {
+        Launcher.printToUser("Encrypted Daemon Program Run");
 
         //Start stat process if conditions set
         if (Stat.endNoAdjacencies != -1)
-            Stat.SetupStats();
+            Stat.setupStats();
 
-        SetupHelloSocket();
+        setupMulticastSocket();
 
         //Router Interface negotiations need to be setup for the first time, so a separate public key exists on each
         //interface. Creating new instances of objects sets up these parameters, including public key.
@@ -50,9 +57,9 @@ public class EncDaemon{
         timerHelloSend.schedule(new TimerTask() {
             @Override
             public void run() {
-                SendDHPubKey();
+                sendDHPubKey();
 
-                SendHelloPackets();
+                sendHelloPackets();
             }
 
         }, 0, 10 * 1000);
@@ -60,7 +67,14 @@ public class EncDaemon{
         threadDHHelloListen.start();
     }
 
-    static void SendHelloPackets() {
+    /**<p><h1>Send Hello Packets</h1></p>
+     * <p>Method used to send hello packets. Uses the method makeHelloPacket for the packet buffer, using
+     * multicastSocket to send the packet to each neighbour. It is part of the timer task for timerHelloSend</p>
+     * <p>This method differs significantly from the version in StdDaemon, firstly by sending only to neighbours. A
+     * neighbour is required for the EncryptionParameters. Also, the version of makeHelloPacket requires the neighbour,
+     * and encrypts the data before sending it.</p>
+     */
+    static void sendHelloPackets() {
         //Skip over neighbours that can't send packets
         if (multicastSocket.isClosed())
             return;
@@ -70,21 +84,35 @@ public class EncDaemon{
             if (neighbour.enParam == null)
                 continue;
 
-            //Encrypt the generic hello buffer,
-            byte[] encHelloBuffer = neighbour.enParam.Encrypt(MakeHelloPacket());
+            //Create an encrypted hello buffer, which already cotnains the encrypted data, correct header checksum and length
+            byte[] encHelloBuffer = makeHelloPacket(neighbour);
 
             try {
+                //Construct packet, set output interface to the current neighbour's interface, send packet on interface.
                 DatagramPacket helloPacket = new DatagramPacket(encHelloBuffer, encHelloBuffer.length, multicastSocketAddr);
+                multicastSocket.setNetworkInterface(neighbour.rIntOwner.toNetworkInterface());
                 multicastSocket.send(helloPacket);
+
             } catch (UnknownHostException ex) {
-                DaemonErrorHandle("UNLIKELY EXCEPTION: 224.0.0.5 not a valid IP", ex);
+                handleDaemonError("UNLIKELY EXCEPTION: 224.0.0.5 not a valid IP", ex);
             } catch (IOException ex) {
-                DaemonErrorHandle("Enc Daemon: IOException when sending hello datagram packet", ex);
+                handleDaemonError("Enc Daemon: IOException when sending hello datagram packet", ex);
             }
         }
     }
 
-    private static void SendDHPubKey() {
+    /**<p><h1>Send Diffie-Hellman PubKey Packets</h1></p>
+     * <p>Method used to send Diffie-Hellman PubKey packets, new for the encrypted daemon. Packets are sent to the
+     * multicastSocket, and sent to each RouterInterface, similar to standard OSPF hello. It is part of the timer task
+     * for timerHelloSend</p>
+     * <p>Interfaces will only be sent packets if the interface is enabled, and if a DH keypair process has not already
+     * been created for the specific interface, as part of a packet limiting function for p2p links. Expansion of the
+     * DHExchange class to support MA links in the future would require modification of this feature.</p>
+     * <p>The method is heavy reliant on the DHExchange class for each router interface to create a buffer, containing
+     * the correct public key.</p>
+     * <p>This </p>
+     */
+    private static void sendDHPubKey() {
         try {
             for(RouterInterface rInt: Config.thisNode.interfaceList) {
                 //Skip processing for disabled interfaces
@@ -100,18 +128,28 @@ public class EncDaemon{
                 DatagramPacket dhHelloPacket = new DatagramPacket(dhHelloBuffer, dhHelloBuffer.length, multicastSocketAddr);
 
                 //send data to interface
-                multicastSocket.setNetworkInterface(rInt.ToNetworkInterface());
+                multicastSocket.setNetworkInterface(rInt.toNetworkInterface());
                 multicastSocket.send(dhHelloPacket);
             }
         } catch (UnknownHostException ex) {
-            DaemonErrorHandle("UNLIKELY EXCEPTION: 224.0.0.5 not a valid IP", ex);
+            handleDaemonError("UNLIKELY EXCEPTION: 224.0.0.5 not a valid IP", ex);
         } catch (IOException ex) {
-            DaemonErrorHandle("Enc Daemon: IOException when sending DH Hello datagram packet", ex);
+            handleDaemonError("Enc Daemon: IOException when sending DH Hello datagram packet", ex);
         }
     }
 
     //TODO: How does UDP socket handle fragmentation (packets over MTU of 1500, as public key is likely to be over this
-    private static void MulticastReceiveThread() {
+    //TODO: Figure out why multiple EncHellos are sent.
+
+    /**<p><h1>Encrypted Multicast Receive Handle Method</h1></p>
+     * <p>Method implemented as a thread to receive an packet from any network joined to the multicast group. A thread
+     * is required as the receive method is blocking.</p>
+     * <p>Once a packet is received, it is verified, data is scraped and it is passed onto specific handle methods, for
+     * use in protocol functions and features.</p>
+     * <p>This variant differs from the standard OSPF version by trying to incorporate decryption, as well as
+     * addition of encrypted ospf (OSPFv4) specific packet (type 6)</p>
+     */
+    private static void receiveMulticastThread() {
         byte[] pBytes =  new byte[4000];
         DatagramPacket pReturned = new DatagramPacket(pBytes, pBytes.length);
 
@@ -120,8 +158,9 @@ public class EncDaemon{
             try  {
                 multicastSocket.receive(pReturned);
             } catch (IOException ex) {
-                DaemonErrorHandle("IOException on MulticastReceiveThread", ex);
+                handleDaemonError("IOException on MulticastReceiveThread", ex);
             }
+
 
             //region VALIDATE
             //Get value used multiple times, source IP.
@@ -136,34 +175,49 @@ public class EncDaemon{
                 continue;
 
             //validate the data. If invalid, packetBuffer will be null so skip over current packet (loop).
-            packetBuffer = StdDaemon.ValidateOSPFHeader(packetBuffer, pSource);
+            packetBuffer = StdDaemon.validateOSPFHeader(packetBuffer, pSource);
             if (packetBuffer == null)
                 continue;
 
             //Try to decrypt the data. TryDecryptBytes only decrypts packets not DH PubKey. Reject packet on null return/
-            packetBuffer = TryDecryptBytes(packetBuffer, pSource);
+            packetBuffer = tryDecryptBytes(packetBuffer, pSource);
             if (packetBuffer == null)
                 continue;
             //endregion VALIDATE
+
 
             //region SCRAPE NEIGHBOUR
             //RID in bytes 4,5,6,7 to string. Using IPAddress class to convert bytes to the RID, easy peasy.
             IPAddressString neighbourRID = new IPAddressNetwork.IPAddressGenerator().from(
                     Arrays.copyOfRange(packetBuffer, 4, 8)
             ).toAddressString();
-            NeighbourNode neighbour = NeighbourNode.GetNeighbourNodeByRID(neighbourRID);
-            //endregion SCRAPE NEIGHBOUR
+            NeighbourNode neighbour = NeighbourNode.getNeighbourNodeByRID(neighbourRID);
+            //endregion
+
 
             switch (packetBuffer[1]) {
                 //Hello packet
-                case 0x01 -> ProcessHelloPacket(neighbour, neighbourRID, packetBuffer);
+                case 0x01 -> {
+                    if (neighbour != null)
+                        processHelloPacket(neighbour, neighbourRID, packetBuffer);
+                }
                 //DH PubKey packet
-                case 0x06 -> ProcessDHPubKeyPacket(neighbour, neighbourRID, pSource, packetBuffer);
+                case 0x06 -> processDHPubKeyPacket(neighbour, neighbourRID, pSource, packetBuffer);
             }
         }
     }
 
-    static void ProcessHelloPacket(NeighbourNode neighbour, IPAddressString neighbourRID, byte[] packetBuffer) {
+    /**<p><h1>EncDaemon Process Hello Packet</h1></p>
+     * <p>Processes a validated hello packet received on the multicast socket. The method scrapes the known neighbours
+     * list, and manipulates the neighbour on this node in the configuration and neighbours table.</p>
+     * <p>This method differs from the StdDaemon as for encryption, neighbours have to exist before, and so never
+     * start off as null. Also, the 2WayReceived method called is different for encryption.</p>
+     * @param neighbour scraped neighbour to manipulate, from NeighbourNode.getNeighbourNodeByRID
+     * @param neighbourRID scraped neighbour RID from buffer
+     * @param packetBuffer raw, but manipulated and validated  packet buffer
+     */
+    static void processHelloPacket(@NotNull NeighbourNode neighbour, @NotNull IPAddressString neighbourRID,
+                                   byte @NotNull [] packetBuffer) {
         int pLength = packetBuffer.length;
 
         //region SCRAPE KNOWN RIDS
@@ -189,49 +243,60 @@ public class EncDaemon{
         }
         //endregion SCRAPE KNOWN RIDS
 
-        if (neighbour.GetState() == ExternalStates.DOWN) {
+        if (neighbour.getState() == ExternalStates.DOWN) {
             //Treat priority byte as string, parse string -> int
             neighbour.priority = Integer.parseUnsignedInt(packetBuffer[31] + "");
 
             Config.thisNode.knownNeighbours.add(neighbourRID);
 
-            Launcher.PrintToUser("New Adjacency for node '" + neighbourRID + "'");
+            Launcher.printToUser("New Adjacency for node '" + neighbourRID + "'");
 
-            neighbour.SetState(ExternalStates.INIT);
+            neighbour.setState(ExternalStates.INIT);
 
             /*Not in OSPF spec to send a hello packet on Down -> Init state, but allows quicker convergence,
             not waiting for hello timer to expire*/
-            SendHelloPackets();
+            sendHelloPackets();
         }
 
         //Update neighbour parameters for each received hello packet
         neighbour.knownNeighbours = reportedKnownRIDs;
-        neighbour.ResetInactiveTimer();
+        neighbour.resetInactiveTimer();
 
         /*If in init state and this neighbour reports to know of this current node, this is the conditions for the
         2WayReceived event. Trigger it*/
-        if (neighbour.GetState() == ExternalStates.INIT && neighbour.knownNeighbours.contains(Config.thisNode.GetRID()))
-            TwoWayReceivedEvent(neighbour);
+        if (neighbour.getState() == ExternalStates.INIT && neighbour.knownNeighbours.contains(Config.thisNode.getRID()))
+            twoWayReceivedEvent(neighbour);
     }
 
-    static void ProcessDHPubKeyPacket(NeighbourNode neighbour, IPAddressString neighbourRID, IPAddress pSource, byte[] packetBuffer) {
+    /**<p><h1>Process Diffie-Hellman PubKey Packet</h1></p>
+     * <p>Processes a validated DH PubKey packet received on the multicast socket. The method creates a neighbour if
+     * it was not yet created, and receives the reported public key. This is used to complete the DHExchange for the
+     * RouterInterface, which will itself create the secrets used in ciphers.</p>
+     * @param neighbour scraped neighbour to manipulate, from NeighbourNode.getNeighbourNodeByRID or null
+     * @param neighbourRID scraped neighbour RID from buffer
+     * @param pSource ip address of packet source, used to create a new neighbour node and link RouterInterface
+     * @param packetBuffer raw, but manipulated and validated  packet buffer
+     */
+    static void processDHPubKeyPacket(NeighbourNode neighbour, @NotNull IPAddressString neighbourRID,
+                                      @NotNull IPAddress pSource, byte @NotNull [] packetBuffer) {
         if (neighbour == null) {
             neighbour = new NeighbourNode(neighbourRID, pSource);
 
-            Launcher.PrintToUser("New DH solicitation for reported node '" +neighbour.GetRID() + "'");
+            Launcher.printToUser("New DH solicitation for reported node '" +neighbour.getRID() + "'");
 
             Config.neighboursTable.add(neighbour);
 
             /*This is a new packet from an unknown neighbour node. send a DH packet immediately with this
             node's public key, so it can generate the secret key.*/
-            SendDHPubKey();
+            //Temp Disabled: with wait function, nodes are likely to send and receive two copies.
+            //SendDHPubKey();
         }
 
         /*The neighbour isn't null now, so this node knows which public key to use. A key was received, so
         this node can calculate the final DH secret.*/
         neighbour.rIntOwner.dhExchange.receiveDHKey(neighbour, packetBuffer);
 
-        EncDaemon.SendHelloPackets();
+        EncDaemon.sendHelloPackets();
     }
 
     /**<p><h1>Encrypted 2WayReceived Event</h1></p>
@@ -240,30 +305,31 @@ public class EncDaemon{
      * <p>The standard and the encrypted 2WayReceived events must be different due to the encryption steps.</p>
      * @param neighbourNode node that has had the 2WayReceived event trigger
      */
-    static void TwoWayReceivedEvent(NeighbourNode neighbourNode) {
+    static void twoWayReceivedEvent(NeighbourNode neighbourNode) {
         //Quick sanity check TwoWayReceived did occur
-        if (neighbourNode.GetState() != ExternalStates.INIT)
+        if (neighbourNode.getState() != ExternalStates.INIT)
             return;
 
         //Set Correct state for event
-        neighbourNode.SetState(ExternalStates.EXSTART);
+        neighbourNode.setState(ExternalStates.EXSTART);
 
 
         //Current future method
         //Statistics Endpoint test
         if ((Config.thisNode.knownNeighbours.size() >= Stat.endNoAdjacencies) && Stat.endNoAdjacencies != -1)
-            Stat.EndStats();
+            Stat.endStats();
     }
 
     /**<p><h1>Make Hello Packet</h1></p>
      * <p>From a generic byte buffer (treated as unsigned), return a hello packet. The packet includes corrected values
      * based on this node's RID, neighbours RIDs, updating the length and internet checksum.</p>
-     * <p></p>
-     * <p>This node's rid is derived from Config.thisNode.rid</p>
-     * <p>The RIDs of neighbours are derived from Config.neighboursTable. The router IDs from each NeighbourNode.rid</p>
+     * <p>This node's rid is derived from Config.thisNode.rid, the RIDs of neighbours are derived from
+     * Config.neighboursTable. The router IDs from each NeighbourNode.rid</p>
+     * <p>This version is specific for encryption, and encrypts the data payload past the header.</p>
      * @return the completed hello packet in bytes.
+     * @param neighbour the neighbour node being communicated with, required for the encryption
      */
-    static byte[] MakeHelloPacket() {
+    static byte[] makeHelloPacket(NeighbourNode neighbour) {
         //Generic buffer that will be updated with specific values.
         byte[] ospfBuffer = {
                 //GENERIC OSPF HEADER
@@ -275,7 +341,9 @@ public class EncDaemon{
                 0x00, 0x00,//checksum
                 0x00, 0x00,//Auth type//0x00, 0x01
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,//Auth Data//0x63, 0x69, 0x73, 0x63, 0x6f, 0x00, 0x00, 0x00//"Cisco"
+        };
 
+        byte[] dataBuffer = {
                 //OSPF HELLO PACKET HEADER
                 (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,//Network Mask, p2p networks equal to 0.0.0.0.
                 0x00, 0x0a,//hello interval//10
@@ -288,43 +356,33 @@ public class EncDaemon{
 
         //Update router ID (4, 5, 6, 7)
         try {
-            byte[] rid = Config.thisNode.GetRIDBytes();
+            byte[] rid = Config.thisNode.getRIDBytes();
             ospfBuffer[4] = rid[0];
             ospfBuffer[5] = rid[1];
             ospfBuffer[6] = rid[2];
             ospfBuffer[7] = rid[3];
         } catch (Exception ex)  {
-            DaemonErrorHandle("Error when creating an OSPF packet: Substituting in router ID.", ex);
+            handleDaemonError("Error when creating an OSPF packet: Substituting in router ID.", ex);
         }
 
         //Update Network Mask? (24, 25, 26, 27)
         //not for this experiment
 
-        //Append neighbours
-        for (NeighbourNode neighbour: Config.neighboursTable) {
+        //Append neighbours to the data buffer
+        for (NeighbourNode n: Config.neighboursTable) {
             //Skip over non-adjacent nodes
-            if (neighbour.GetState() == ExternalStates.DOWN)
+            if (n.getState() == ExternalStates.DOWN)
                 continue;
 
-            ospfBuffer = Bytes.concat(ospfBuffer, neighbour.GetRIDBytes());
+            dataBuffer = Bytes.concat(dataBuffer, n.getRIDBytes());
         }
 
+        //Encrypt the buffer of known neighbours and append it to the data portion of the packet.
+        dataBuffer = neighbour.enParam.encrypt(dataBuffer);
+        ospfBuffer = Bytes.concat(ospfBuffer, dataBuffer);
 
-        //Update packet length (2, 3)
-        int packetLength = ospfBuffer.length;
-        ByteBuffer lenBuffer = ByteBuffer.allocate(4);
-        lenBuffer.putInt(packetLength);
-        ospfBuffer[2] = lenBuffer.array()[2];
-        ospfBuffer[3] = lenBuffer.array()[3];
-
-
-        //Update Checksum (12, 13)
-        ByteBuffer chkBuffer = ByteBuffer.allocate(8);
-        chkBuffer.putLong(Launcher.IpChecksum(ospfBuffer));
-        ospfBuffer[12] = chkBuffer.array()[6];
-        ospfBuffer[13] = chkBuffer.array()[7];
-
-        return ospfBuffer;
+        //Update packet length (2, 3), Update Checksum (12, 13)
+        return updateChecksumAndLength(ospfBuffer);
     }
 
     /**<p><h1>Try to Decrypt Packet Buffer</h1></p>
@@ -335,7 +393,7 @@ public class EncDaemon{
      * @param pSource the packet source IP address
      * @return the full decrypted packet or null for invalid parameters or conditions
      */
-    private static byte[] TryDecryptBytes(byte[] data, IPAddress pSource) {
+    private static byte[] tryDecryptBytes(byte[] data, IPAddress pSource) {
 
         //Skip data already in plaintext (DH PubKey packet)
         if (data[1] == 0x06)
@@ -345,14 +403,14 @@ public class EncDaemon{
         IPAddressString neighbourRID = new IPAddressNetwork.IPAddressGenerator().from(
                 Arrays.copyOfRange(data, 4, 8)
         ).toAddressString();
-        NeighbourNode neighbour = NeighbourNode.GetNeighbourNodeByRID(neighbourRID);
+        NeighbourNode neighbour = NeighbourNode.getNeighbourNodeByRID(neighbourRID);
 
         //If neighbour doesn't exist, and the packet was not a DH PubKey, then reject the packet returning null.
         if (neighbour == null)
             return null;
 
         //Sanity check, verify neighbour was received on the correct network.
-        if (!neighbour.rIntOwner.equals(RouterInterface.GetInterfaceByIPNetwork(pSource)))
+        if (!neighbour.rIntOwner.equals(RouterInterface.getInterfaceByIPNetwork(pSource)))
             return null;
 
         //Reject the packet with null if no encryption parameters have been set up. Can't encrypt or decrypt.
@@ -360,7 +418,7 @@ public class EncDaemon{
             return null;
 
         //Finally, perform the decrypt on a packet that should be valid.
-        return neighbour.enParam.Decrypt(data);
+        return neighbour.enParam.decrypt(data);
     }
     //endregion
 }
