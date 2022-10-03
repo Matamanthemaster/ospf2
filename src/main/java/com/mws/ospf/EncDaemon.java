@@ -52,19 +52,19 @@ public class EncDaemon {
             rInt.dhExchange = new DHExchange(rInt);
         }
 
+        //Start listening for hello packets before sending them. Should force that packets are not received before
+        threadDHHelloListen.start();
+
         //Create a timer for hello and set it to run instantly. Running the timer schedules further running.
         timerHelloSend = new Timer();
         timerHelloSend.schedule(new TimerTask() {
             @Override
             public void run() {
-                sendDHPubKey();
-
                 sendHelloPackets();
+                sendDHPubKey();
             }
 
         }, 0, 10 * 1000);
-
-        threadDHHelloListen.start();
     }
 
     /**<p><h1>Send Hello Packets</h1></p>
@@ -75,9 +75,10 @@ public class EncDaemon {
      * and encrypts the data before sending it.</p>
      */
     static void sendHelloPackets() {
-        //Skip over neighbours that can't send packets
+        //Prevent sending if multicast socket was not setup prior. More of a sanity check.
         if (multicastSocket.isClosed())
             return;
+
 
         for (NeighbourNode neighbour: Config.neighboursTable) {
             //Skip neighbours without encryption setup.
@@ -137,9 +138,6 @@ public class EncDaemon {
             handleDaemonError("Enc Daemon: IOException when sending DH Hello datagram packet", ex);
         }
     }
-
-    //TODO: How does UDP socket handle fragmentation (packets over MTU of 1500, as public key is likely to be over this
-    //TODO: Figure out why multiple EncHellos are sent.
 
     /**<p><h1>Encrypted Multicast Receive Handle Method</h1></p>
      * <p>Method implemented as a thread to receive an packet from any network joined to the multicast group. A thread
@@ -279,24 +277,41 @@ public class EncDaemon {
      */
     static void processDHPubKeyPacket(NeighbourNode neighbour, @NotNull IPAddressString neighbourRID,
                                       @NotNull IPAddress pSource, byte @NotNull [] packetBuffer) {
+        /*Check first that there already isn't a key being processed for the interface. If there is, processing the
+        packet will be ineffective, making the key a second time, and sending extra hello packets*/
+        RouterInterface rInt = RouterInterface.getInterfaceByIPNetwork(pSource);
+        if (rInt == null)
+            return;
+        if (rInt.dhExchange.flagProcessingKey)
+            return;
+
         if (neighbour == null) {
             neighbour = new NeighbourNode(neighbourRID, pSource);
 
-            Launcher.printToUser("New DH solicitation for reported node '" +neighbour.getRID() + "'");
 
             Config.neighboursTable.add(neighbour);
 
             /*This is a new packet from an unknown neighbour node. send a DH packet immediately with this
-            node's public key, so it can generate the secret key.*/
-            //Temp Disabled: with wait function, nodes are likely to send and receive two copies.
-            //SendDHPubKey();
+            node's public key, so it can guarantee to generate the secret key this cycle.
+            Nodes are likely to send and receive two copies. For normal hello that's ok, because the second packet
+            contains the neighbour in the sent neighbours list
+
+            For experiment purposes, the wait function makes it likely only one packet is needed, so if wait is being
+            used, don't send guarantee sync with extra packets*/
+            if (!(Launcher.flagWait || Launcher.flagStart)) {
+                sendDHPubKey();
+            }
         }
+
+        Launcher.printToUser("New DH solicitation for reported node '" + neighbour.getRID() + "'");
 
         /*The neighbour isn't null now, so this node knows which public key to use. A key was received, so
         this node can calculate the final DH secret.*/
         neighbour.rIntOwner.dhExchange.receiveDHKey(neighbour, packetBuffer);
 
-        EncDaemon.sendHelloPackets();
+        //Not in OSPF spec to send an extra packet on receiving one from a down neighbour.
+        if (neighbour.getState() == ExternalStates.DOWN)
+            EncDaemon.sendHelloPackets();
     }
 
     /**<p><h1>Encrypted 2WayReceived Event</h1></p>
@@ -313,6 +328,8 @@ public class EncDaemon {
         //Set Correct state for event
         neighbourNode.setState(ExternalStates.EXSTART);
 
+        //Prevent the DHExchange from sending DHPubKey packets on the rint (ASSUMES INTERFACE IS P2P)
+        neighbourNode.rIntOwner.dhExchange.flagComplete = true;
 
         //Current future method
         //Statistics Endpoint test

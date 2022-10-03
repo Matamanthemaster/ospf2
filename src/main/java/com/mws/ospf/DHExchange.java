@@ -25,6 +25,7 @@ public class DHExchange {
     private KeyPair thisNodeKeyPair;
     private KeyAgreement keyAgreement;
     boolean flagComplete = false;
+    boolean flagProcessingKey = false;
     //endregion OBJECT PROPERTIES
 
     //region OBJECT METHODS
@@ -63,6 +64,7 @@ public class DHExchange {
      * @param receiveBuffer the raw OSPFv4 type 6 packet (DH PubKey) containing the public key
      */
     void receiveDHKey(NeighbourNode neighbour, byte[] receiveBuffer) {
+        flagProcessingKey = true;
         byte[] encPubKey = Arrays.copyOfRange(receiveBuffer, 26, receiveBuffer.length);
 
         //Match the reported key size to the key used. For the artefact, is a sanity check, as size is hard coded 20 2048
@@ -79,8 +81,8 @@ public class DHExchange {
             secretKey = keyAgreement.generateSecret();
             SecretKeySpec finalKey = new SecretKeySpec(secretKey, 0, 16, "AES");
             neighbour.enParam = new EncryptionParameters(finalKey);
-            flagComplete = true;
         } catch (InvalidKeyException ex) {
+            flagProcessingKey = false;//Reset flag, as no longer processing a key.
             // Ex on code:  keyAgreement.doPhase(neighbourPubKey,true);
             Launcher.printToUser("Received DH PubKey packet " + neighbour.getRID() + " on interface " +
                     this.rIntOwner.getName() + "that was invalid:");

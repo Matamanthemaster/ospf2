@@ -42,6 +42,9 @@ public class StdDaemon {
 
         setupMulticastSocket();
 
+        //Start listening for hello packets before sending them. Should force that packets are not received before
+        threadHelloListen.start();
+
         //Create a timer for hello and set it to run instantly. Running the timer schedules further running.
         timerHelloSend = new Timer();
         timerHelloSend.schedule(new TimerTask() {
@@ -51,7 +54,6 @@ public class StdDaemon {
             }
         }, 0, 10 * 1000);
 
-        threadHelloListen.start();
     }
 
     /**<p><h1>Setup Multicast Socket</h1></p>

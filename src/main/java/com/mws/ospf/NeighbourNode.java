@@ -116,14 +116,19 @@ public class NeighbourNode extends Node {
         } catch (IllegalStateException ignored) {}//IllegalStateException: Timer already cancelled.
 
         this.knownNeighbours.clear();
+        this.enParam = null;
         this.setState(ExternalStates.DOWN);
         Launcher.printToUser("Dead timer expired: " + this.getRID());
 
         //Update neighbours on topology change
         if (Launcher.operationMode.equals("standard"))
             StdDaemon.sendHelloPackets();
-        if (Launcher.operationMode.equals("encrypted"))
+        if (Launcher.operationMode.equals("encrypted")) {
             EncDaemon.sendHelloPackets();
+
+            //Also for encrypted nodes, begin DHKeyExchange again (Assumes p2p network)
+            this.rIntOwner.dhExchange = new DHExchange(rIntOwner);
+        }
     }
     //endregion
 }
