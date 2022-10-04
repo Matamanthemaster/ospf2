@@ -2,7 +2,6 @@ package com.mws.ospf;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Shorts;
-import com.mws.ospf.pdt.ExternalStates;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressNetwork;
 import inet.ipaddr.IPAddressString;
@@ -24,7 +23,7 @@ import static com.mws.ospf.StdDaemon.*;
  */
 public class EncDaemon {
     //region STATIC PROPERTIES
-    private static final Thread threadDHHelloListen = new Thread(EncDaemon::receiveMulticastThread,
+    static final Thread threadEncMulticastListen = new Thread(EncDaemon::receiveMulticastThread,
             "Thread-DHHello-Receive");
     //endregion
 
@@ -34,7 +33,7 @@ public class EncDaemon {
      * implemented methods to handle communication. Init the encrypted process flow of new OSPF.</p>
      * <p>Utilises the same socket as the StdDaemon.</p>
      */
-    public static void main() {
+    static void main() {
         Launcher.printToUser("Encrypted Daemon Program Run");
 
         //Start stat process if conditions set
@@ -53,7 +52,7 @@ public class EncDaemon {
         }
 
         //Start listening for hello packets before sending them. Should force that packets are not received before
-        threadDHHelloListen.start();
+        threadEncMulticastListen.start();
 
         //Create a timer for hello and set it to run instantly. Running the timer schedules further running.
         timerHelloSend = new Timer();
@@ -214,7 +213,7 @@ public class EncDaemon {
      * @param neighbourRID scraped neighbour RID from buffer
      * @param packetBuffer raw, but manipulated and validated  packet buffer
      */
-    static void processHelloPacket(@NotNull NeighbourNode neighbour, @NotNull IPAddressString neighbourRID,
+    private static void processHelloPacket(@NotNull NeighbourNode neighbour, @NotNull IPAddressString neighbourRID,
                                    byte @NotNull [] packetBuffer) {
         int pLength = packetBuffer.length;
 
@@ -275,7 +274,7 @@ public class EncDaemon {
      * @param pSource ip address of packet source, used to create a new neighbour node and link RouterInterface
      * @param packetBuffer raw, but manipulated and validated  packet buffer
      */
-    static void processDHPubKeyPacket(NeighbourNode neighbour, @NotNull IPAddressString neighbourRID,
+    private static void processDHPubKeyPacket(NeighbourNode neighbour, @NotNull IPAddressString neighbourRID,
                                       @NotNull IPAddress pSource, byte @NotNull [] packetBuffer) {
         /*Check first that there already isn't a key being processed for the interface. If there is, processing the
         packet will be ineffective, making the key a second time, and sending extra hello packets*/
@@ -320,7 +319,7 @@ public class EncDaemon {
      * <p>The standard and the encrypted 2WayReceived events must be different due to the encryption steps.</p>
      * @param neighbourNode node that has had the 2WayReceived event trigger
      */
-    static void twoWayReceivedEvent(NeighbourNode neighbourNode) {
+    private static void twoWayReceivedEvent(NeighbourNode neighbourNode) {
         //Quick sanity check TwoWayReceived did occur
         if (neighbourNode.getState() != ExternalStates.INIT)
             return;
@@ -346,7 +345,7 @@ public class EncDaemon {
      * @return the completed hello packet in bytes.
      * @param neighbour the neighbour node being communicated with, required for the encryption
      */
-    static byte[] makeHelloPacket(NeighbourNode neighbour) {
+    private static byte[] makeHelloPacket(NeighbourNode neighbour) {
         //Generic buffer that will be updated with specific values.
         byte[] ospfBuffer = {
                 //GENERIC OSPF HEADER

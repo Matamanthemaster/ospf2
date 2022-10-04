@@ -2,7 +2,6 @@ package com.mws.ospf;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Shorts;
-import com.mws.ospf.pdt.ExternalStates;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressNetwork;
 import inet.ipaddr.IPAddressString;
@@ -25,7 +24,7 @@ public class StdDaemon {
     static Timer timerHelloSend;
 
     //Setup thread for hello multicast server
-    private static final Thread threadHelloListen = new Thread(StdDaemon::receiveMulticastThread, "Thread-Hello-Receive");
+    private static final Thread threadStdMulticastListen = new Thread(StdDaemon::receiveMulticastThread, "Thread-Hello-Receive");
     //endregion
 
     //region STATIC METHODS
@@ -43,7 +42,7 @@ public class StdDaemon {
         setupMulticastSocket();
 
         //Start listening for hello packets before sending them. Should force that packets are not received before
-        threadHelloListen.start();
+        threadStdMulticastListen.start();
 
         //Create a timer for hello and set it to run instantly. Running the timer schedules further running.
         timerHelloSend = new Timer();
@@ -219,8 +218,8 @@ public class StdDaemon {
      * @param pSource ip address of packet source, used to create a new neighbour node
      * @param packetBuffer raw, but manipulated and validated  packet buffer
      */
-    static void processHelloPacket(NeighbourNode neighbour, IPAddressString neighbourRID, IPAddress pSource,
-                                   byte[] packetBuffer) {
+    private static void processHelloPacket(NeighbourNode neighbour, IPAddressString neighbourRID, IPAddress pSource,
+                                            byte[] packetBuffer) {
         int pLength = packetBuffer.length;
 
         //region SCRAPE KNOWN RIDS
@@ -283,7 +282,7 @@ public class StdDaemon {
      * fired. This method is the trigger for the exchange protocol to start for the neighbour node.</p>
      * @param neighbourNode node that has had the 2WayReceived event trigger
      */
-    static void twoWayReceivedEvent(NeighbourNode neighbourNode) {
+    private static void twoWayReceivedEvent(NeighbourNode neighbourNode) {
         //Quick sanity check TwoWayReceived did occur
         if (neighbourNode.getState() != ExternalStates.INIT)
             return;
@@ -306,7 +305,7 @@ public class StdDaemon {
      * <p>The RIDs of neighbours are derived from Config.neighboursTable. The router IDs from each NeighbourNode.rid</p>
      * @return the completed hello packet in bytes.
      */
-    static byte[] makeHelloPacket() {
+    private static byte[] makeHelloPacket() {
         //Generic buffer that will be updated with specific values.
         byte[] ospfBuffer = {
                 //GENERIC OSPF HEADER
@@ -402,9 +401,14 @@ public class StdDaemon {
         }
 
         //Clean exit
-        timerHelloSend.cancel();
-        threadHelloListen.interrupt();
-        multicastSocket.close();
+        if (timerHelloSend != null)
+            timerHelloSend.cancel();
+        if (threadStdMulticastListen.isAlive())
+            threadStdMulticastListen.interrupt();
+        if (EncDaemon.threadEncMulticastListen.isAlive())
+            EncDaemon.threadEncMulticastListen.interrupt();
+        if (multicastSocket != null)
+            multicastSocket.close();
         System.exit(-3);
     }
     //endregion

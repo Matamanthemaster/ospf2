@@ -1,6 +1,5 @@
 package com.mws.ospf;
 
-import com.mws.ospf.pdt.ExternalStates;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
 import javafx.scene.control.Tab;

@@ -15,15 +15,14 @@ import java.util.*;
 public class Stat {
     //region STATIC PROPERTIES
     static File fileStats =  new File(System.getProperty("user.dir") + System.getProperty("file.separator") + "ospf.stat.csv");
+    static int endNoAdjacencies = -1;
     private static long tsStart;
     private static long tsConvergence;
     private static final LinkedHashMap<Long, Integer> mapListTime = new LinkedHashMap<>();
     private static final List<Long> cpuTime = new ArrayList<>();
     private static final List<Long> memUsage = new ArrayList<>();
     private static final Timer timerStatUpdate = new Timer("Timer-Stat");
-    private static OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-    static int endNoAdjacencies = -1;
-
+    private static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     //endregion STATIC PROPERTIES
 
     //region STATIC METHODS
@@ -31,7 +30,7 @@ public class Stat {
      * <p>Records the first set of statistics as a base point, especially for timings. Also starts the statistics timer
      * scheduled to record periodically. The statistic poll time is a static value in code.</p>
      */
-    public static void setupStats() {
+    static void setupStats() {
         //Change poleIntervalMs to change how frequently resource stats are polled
         int pollIntervalMs = 10;
         System.out.println("STATS: Statistics collection started");
@@ -51,7 +50,7 @@ public class Stat {
      * <p>Call at the end of processing, when endNoAdjacencies condition has been met. Records a final statistic, and
      * works towards saving all data. Creates the stats csv file fileStats, and populates it with experimental data</p>
      */
-    public static void endStats() {
+    static void endStats() {
         //get endpoint of statistics
         tsConvergence = System.nanoTime();
         recordStat(tsConvergence);

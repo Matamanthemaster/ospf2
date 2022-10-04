@@ -1,4 +1,4 @@
-package com.mws.ospf.pdt;
+package com.mws.ospf;
 
 /**<p><h1>External States</h1></p>
  * <p>The state of a neighbour node. Based on OSPF states, used in protocol process flow. Each state has an associated

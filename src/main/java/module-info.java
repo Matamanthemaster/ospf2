@@ -10,6 +10,5 @@ module com.mws.ospf {
     requires jdk.management;
 
     exports com.mws.ospf;
-    exports com.mws.ospf.pdt;
     opens com.mws.ospf to javafx.fxml, javafx.graphics;
 }

@@ -1,6 +1,5 @@
 package com.mws.ospf;
 
-import com.mws.ospf.pdt.InterfaceType;
 import inet.ipaddr.IPAddress;
 import org.jetbrains.annotations.NotNull;
 

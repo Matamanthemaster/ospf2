@@ -1,6 +1,5 @@
 package com.mws.ospf;
 
-import com.mws.ospf.pdt.InterfaceType;
 import inet.ipaddr.AddressStringException;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressNetwork;
@@ -48,23 +47,15 @@ public class Config {
      * <p>Uses default path: ./ospf.conf.xml</p>
      */
     static void setConfig() {
-        commonMain(System.getProperty("user.dir") + System.getProperty("file.separator") + "ospf.conf.xml");
-    }
-
-    /**<p><h1>Set Config File</h1></p>
-     * <p>Set method for OSPF config that takes a specific config file path. Creates a config file if it doesn't
-     * already exist. Also populates local variables with values from the config.</p>
-     * @param path config file path
-     */
-    static void setConfig(String path) {
-        commonMain(path);
+        setConfig(System.getProperty("user.dir") + System.getProperty("file.separator") + "ospf.conf.xml");
     }
 
     /**<p><h1>Config Main Method</h1></p>
-     * <p>Main start method that performs the common jobs, instead of copying code between set methods.</p>
+     * <p>Set method for OSPF config that takes a specific config file path. Creates a config file if it doesn't
+     * already exist. Also populates local variables with values from the config.</p>
      * @param path Config file path
      */
-    private static void commonMain(String path) {
+    static void setConfig(String path) {
         fileConfig = new File(path);
         if (flagFileConfRemove)
             fileConfig.delete();

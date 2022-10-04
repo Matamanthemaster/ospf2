@@ -17,22 +17,21 @@ public class Launcher {
     private final static String commandUsage =
             "Usage: java -jar ospf.jar [arguments] <Operation Mode Flag>" + System.lineSeparator() +
                     "Arguments:" + System.lineSeparator() +
-                    "   --help                      Prints this help message" + System.lineSeparator() +
-                    "   -g, --with-gui              Runs the program with the GUI frontend" + System.lineSeparator() +
-                    "   -c, --config-file </Path>   Specify an alternate config file (Default ./ospf.conf.xml)" + System.lineSeparator() +
-                    "   -W, --wait                  Tell the application to wait for a start signal from an adjacent node" + System.lineSeparator() +
-                    "   -S, --start-exp             Tell the application to send a start signal to all connected nodes" + System.lineSeparator() +
-                    "   -s, --stats-file </Path>    Specify an alternative statistic file path (Default ./ospf.stats.csv)" + System.lineSeparator() +
-                    "   -n  --adjacency-no #        Specify how many " + System.lineSeparator() +
+                    "   --help                              Prints this help message" + System.lineSeparator() +
+                    "   -g, --with-gui                      Runs the program with the GUI frontend" + System.lineSeparator() +
+                    "   -c, --config-file </Path/To/File>   Specify an alternate config file (Default ./ospf.conf.xml)" + System.lineSeparator() +
+                    "   -W, --wait                          Tell the application to wait for a start signal from an adjacent node" + System.lineSeparator() +
+                    "   -S, --start-exp                     Tell the application to send a start signal to all connected nodes" + System.lineSeparator() +
+                    "   -s, --stats-file </Path/To/File>    Specify an alternative statistic file path (Default ./ospf.stats.csv)" + System.lineSeparator() +
+                    "   -n  --adjacency-no <#>              Specify how many " + System.lineSeparator() +
                     "Operation Mode Flags:" + System.lineSeparator() +
                     "   --Standard-OSPF" + System.lineSeparator() +
                     "   --Encrypted-OSPF" + System.lineSeparator();
     private static Thread uiThread;
-    static Thread daemonThread;
+    private static Thread daemonThread;
     static String operationMode;
     static boolean flagWait;
     static boolean flagStart;
-    static MulticastSocket socketExperimentWait;
     //endregion
 
     //region STATIC METHODS
@@ -78,9 +77,9 @@ public class Launcher {
         //to connected nodes, and used to synchronise with them. This logic is all oneshot.
         long startTimeEpoch = (System.currentTimeMillis()/1000) + 2;
 
-        try {
-            //Create a broadcast socket, create a datagram packet to send
-            socketExperimentWait = new MulticastSocket(25566);
+        //Create a broadcast socket, create a datagram packet to send. Uses try-with-resources.
+        try (MulticastSocket socketExperimentWait = new MulticastSocket(25566)) {
+
             socketExperimentWait.setBroadcast(true);
 
             String message = String.valueOf(startTimeEpoch);

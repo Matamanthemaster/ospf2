@@ -1,4 +1,4 @@
-package com.mws.ospf.pdt;
+package com.mws.ospf;
 
 
 /**<p><h1>Interface Types</h1></p>
