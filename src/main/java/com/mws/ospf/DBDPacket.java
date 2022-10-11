@@ -1,4 +1,4 @@
-package com.mws.ospf.pdt;
+package com.mws.ospf;
 
 import java.util.ArrayList;
 import java.util.List;
