@@ -128,6 +128,9 @@ public class NeighbourNode extends Node {
             //Also for encrypted nodes, begin DHKeyExchange again (Assumes p2p network)
             this.rIntOwner.dhExchange = new DHExchange(rIntOwner);
         }
+
+        //Refresh the local LSA.
+        Config.lsdb.setupLocalRLSA();
     }
     //endregion
 }

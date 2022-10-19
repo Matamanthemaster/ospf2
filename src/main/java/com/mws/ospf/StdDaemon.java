@@ -39,6 +39,7 @@ public class StdDaemon {
         if (Stat.endNoAdjacencies != -1)
             Stat.setupStats();
 
+        Config.lsdb = new LSDB();
         setupMulticastSocket();
 
         //Start listening for hello packets before sending them. Should force that packets are not received before
@@ -290,6 +291,8 @@ public class StdDaemon {
         //Set Correct state for event
         neighbourNode.setState(ExternalStates.EXSTART);
 
+        //Refresh the local LSA, which will add the new neighbour
+        Config.lsdb.setupLocalRLSA();
 
         //Current future method
         //Statistics Endpoint test

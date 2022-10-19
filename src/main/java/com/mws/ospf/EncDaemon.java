@@ -40,7 +40,9 @@ public class EncDaemon {
         if (Stat.endNoAdjacencies != -1)
             Stat.setupStats();
 
+        Config.lsdb = new LSDB();
         setupMulticastSocket();
+
 
         //Router Interface negotiations need to be setup for the first time, so a separate public key exists on each
         //interface. Creating new instances of objects sets up these parameters, including public key.
@@ -329,6 +331,9 @@ public class EncDaemon {
 
         //Prevent the DHExchange from sending DHPubKey packets on the rint (ASSUMES INTERFACE IS P2P)
         neighbourNode.rIntOwner.dhExchange.flagComplete = true;
+
+        //Refresh the local LSA, which will add the new neighbour
+        Config.lsdb.setupLocalRLSA();
 
         //Current future method
         //Statistics Endpoint test

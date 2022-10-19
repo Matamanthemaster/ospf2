@@ -37,7 +37,7 @@ public class Config {
     static boolean flagFileConfRemove;
     static ThisNode thisNode;//Accessible to all here.
     static List<NeighbourNode> neighboursTable = new ArrayList<>();
-    static LSDB lsdb = new LSDB();
+    static LSDB lsdb;
     //endregion
 
     //region STATIC METHODS

@@ -17,6 +17,7 @@ import java.util.List;
 public class RouterInterface {
     //region STATIC PROPERTIES
     private static final List<RouterInterface> _RouterInterfaces = new ArrayList<>();
+    private static final long REFERENCE_BANDWIDTH = InterfaceType.E100BASET.getBandwidth();
     //endregion
 
     //region STATIC METHODS
@@ -60,6 +61,7 @@ public class RouterInterface {
     public InterfaceType type; //Interface type identifier. Used by code to determine what type of interface it is. Uses enum
     public Boolean isEnabled; //Interface on?
     public long bandwidth; //BW used by default OSPF calculation, derived from interface type in constructor.
+    int cost = -1;
     DHExchange dhExchange;
     //endregion
 
@@ -96,6 +98,29 @@ public class RouterInterface {
      */
     public String getName() {
         return name;
+    }
+
+    /**<p><h1>Get Cost</h1></p>
+     * <p>Returns a value for cost, using multiple industry techniques to derive a value.</p>
+     * <p>First, if cost is statically defined, use this value. Second, calculate a cost from the reference bandwidth
+     * and interface bandwidth. If the interface bandwidth is greater than the reference (as in, calculation value is
+     * between 0 and 1), treat the cost as 1.</p>
+     * @return interface cost calculated
+     */
+    public int getCost() {
+        //Use static cost if defined.
+        if (cost != -1)
+            return cost;
+
+        //if cost < 1, set cost = 1 (bandwidth = reference; reference/reference = 1 = cost)
+        long bandwidth = this.bandwidth;
+        if (bandwidth > REFERENCE_BANDWIDTH)
+            bandwidth = REFERENCE_BANDWIDTH;
+
+        //Perform cost calculation, as longs, which is bandwidth. Reference will scale down number a lot. End value
+        //needs to be an unsigned short, so return it as an int, only returning the first 16 bits.
+        bandwidth = REFERENCE_BANDWIDTH / bandwidth;
+        return (int) bandwidth & 0x0000ffff;
     }
 
     /**<p><h1>ToNetworkInterface</h1></p>
