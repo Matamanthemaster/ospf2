@@ -40,14 +40,16 @@ public class NeighbourNode extends Node {
     //endregion
 
     //region OBJECT PROPERTIES
-    public int priority = -1;
+    int priority = -1;
     private ExternalStates state = ExternalStates.DOWN;
-    public IPAddress ipAddress;
-    public final RouterInterface rIntOwner;
+    IPAddress ipAddress;
+    final RouterInterface rIntOwner;
     EncryptionParameters  enParam;
     Timer timerInactivity;
+    DBDPacket lastSentDBD;
+    DBDPacket lastReceivedDBD;
     private boolean flagTimerInactRunning = false;
-    public Tab tab;
+    Tab tab;
     //endregion
 
     //region OBJECT METHODS
@@ -115,8 +117,10 @@ public class NeighbourNode extends Node {
         } catch (IllegalStateException ignored) {}//IllegalStateException: Timer already cancelled.
 
         this.knownNeighbours.clear();
-        this.enParam = null;
         this.setState(ExternalStates.DOWN);
+        this.enParam = null;
+        this.lastSentDBD = null;
+        this.lastReceivedDBD = null;
         Launcher.printToUser("Dead timer expired: " + this.getRID());
 
         //Update neighbours on topology change

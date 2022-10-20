@@ -9,6 +9,10 @@ import inet.ipaddr.IPAddressString;
  * either ThisNode or learned from a NeighbourNode.</p>
  */
 class LinkData {
+    //region STATIC CONSTANTS
+    static final int LINK_DATA_SIZE = 12;
+    //endregion STATIC CONSTANTS
+
     //region OBJECT PARAMETERS
     private final byte[] linkID;
     private final byte[] data;

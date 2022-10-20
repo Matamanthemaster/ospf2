@@ -22,9 +22,9 @@ public class StdDaemon {
     static MulticastSocket multicastSocket;
     static InetSocketAddress multicastSocketAddr;
     static Timer timerHelloSend;
-
     //Setup thread for hello multicast server
     private static final Thread threadStdMulticastListen = new Thread(StdDaemon::receiveMulticastThread, "Thread-Hello-Receive");
+    static final int HEADER_LENGTH = 20;
     //endregion
 
     //region STATIC METHODS
@@ -165,10 +165,9 @@ public class StdDaemon {
 
             //Branch, pass to packet processor for each specific packet type.
             switch (packetBuffer[1]) {
-                //Hello Packet
                 case 0x01 -> processHelloPacket(neighbour, neighbourRID, pSource, packetBuffer);
+                case 0x02 -> processDBDPacket(neighbour, pSource, packetBuffer);
             }
-
         }
     }
 
@@ -278,6 +277,13 @@ public class StdDaemon {
             twoWayReceivedEvent(neighbour);
     }
 
+    private static void processDBDPacket(NeighbourNode neighbour, IPAddress pSource, byte[] packetBuffer) {
+        //On first
+        if (neighbour.lastSentDBD == null) {
+
+        }
+    }
+
     /**<p><h1>Standard 2WayReceived Event</h1></p>
      * <p>On neighbour state Init, if a node receives a hello packet with its own RID echoed, the event 2WayReceived is
      * fired. This method is the trigger for the exchange protocol to start for the neighbour node.</p>
@@ -293,6 +299,20 @@ public class StdDaemon {
 
         //Refresh the local LSA, which will add the new neighbour
         Config.lsdb.setupLocalRLSA();
+
+        //TODO: Investigate if full LSAs could be exchanged under specification.
+        //TODO: Test send code.
+        //TODO: Make receive code.
+        neighbourNode.lastSentDBD = new DBDPacket(1300, 0, (byte) 0x07, null);
+        try {
+            multicastSocket.setNetworkInterface(neighbourNode.rIntOwner.toNetworkInterface());
+            DatagramPacket packet = new DatagramPacket(neighbourNode.lastSentDBD.packetBuffer, neighbourNode.lastSentDBD.packetBuffer.length, multicastSocketAddr);
+            multicastSocket.send(packet);
+        } catch (SocketException ex) {
+            handleDaemonError("SocketException when sending first DBD packet to neighbour", ex);
+        } catch (IOException ex) {
+            handleDaemonError("IOException when sending first DBD packet to neighbour", ex);
+        }
 
         //Current future method
         //Statistics Endpoint test

@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static com.mws.ospf.LinkData.LINK_DATA_SIZE;
+
 /**<p><h1>Type 1 LSA</h1></p>
  * <p>A type 1 (Router) LSA. LSAs store data for the LSDB, and being sent via LSU packets. The class is used to store
  * an LSA on the node, formatted data, and contains methods to convert it to a either a full LSU buffer, or DBD summary</p>
@@ -31,6 +33,7 @@ class RLSA {
      * </p>
      */
     static final int MAX_AGE = 3600;
+    static final int LSA_HEADER_LENGTH = 20;
     //endregion STATIC CONSTANTS
 
     //region STATIC METHODS
@@ -42,7 +45,7 @@ class RLSA {
      * @throws IllegalArgumentException if the lsa buffer didn't contain an LSA header
      */
     static boolean isChecksumCorrect(byte[] lsaBuffer) {
-        if (lsaBuffer.length < 20)
+        if (lsaBuffer.length < LSA_HEADER_LENGTH)
             throw new IllegalArgumentException("The LSA buffer provided doesn't meet the size requirement for the LSA" +
                     " header, and so the LSA is invalid");
 
@@ -77,6 +80,8 @@ class RLSA {
     //endregion STATIC METHODS
 
     //TODO: Change access rights
+    //TODO: Change access rights for LSDB
+    //TODO: Check access rights for classes? Should they all be public?
     //region OBJECT PROPERTIES
     /**<p><h1>14.  Aging The Link State Database</h1></p>
      * <p>
@@ -184,7 +189,7 @@ class RLSA {
      * @throws ArithmeticException data provided was invalid. Either checksum or length fields, or the link data
      */
     public RLSA(byte[] lsaBuffer) {
-        if (lsaBuffer.length < 20)
+        if (lsaBuffer.length < LSA_HEADER_LENGTH)
             throw new IllegalArgumentException("The LSA buffer provided doesn't meet the size requirement for the LSA" +
                     " header, and so the LSA is invalid");
 
@@ -213,7 +218,7 @@ class RLSA {
 
         /*All data before this point was in the 20 byte header. If there is no more data, as in the header was only
         being processed, then end here. If there is more than 20 bytes, then */
-        if (lsaBuffer.length == 20)
+        if (lsaBuffer.length == LSA_HEADER_LENGTH)
             return;
 
 
@@ -225,16 +230,16 @@ class RLSA {
         int checkNoLinks = lsaBuffer.length;
         checkNoLinks -= 24;
 
-        if (checkNoLinks % 12 != 0)
+        if (checkNoLinks % LINK_DATA_SIZE != 0)
             throw new ArithmeticException("Malformed link state information after number of links");
-        if (noLinks != (checkNoLinks / 12))
+        if (noLinks != (checkNoLinks / LINK_DATA_SIZE))
             throw new ArithmeticException("Reported number of links doesn't match the number of links in the packet.");
 
         //Now link state information format was verified, scrape data from the packet.
-        for (int i = 0; i < noLinks * 12; i+= 12) {
+        for (int i = 0; i < noLinks * LINK_DATA_SIZE; i += LINK_DATA_SIZE) {
             //Create a subset of the lsaBuffer for the individual link data. Exclude first 24 bytes of header. Only copy
             //the 12 bytes relative to the current link information.
-            byte[] linkBuffer = Arrays.copyOfRange(lsaBuffer, 24+i, 24+i+12);
+            byte[] linkBuffer = Arrays.copyOfRange(lsaBuffer, 24+i, 24+i+LINK_DATA_SIZE);
 
             //Scrape all needed data from the buffer subset, combine it into a LinkData object.
             LinkData newLinkData = new LinkData(
@@ -372,7 +377,7 @@ class RLSA {
      */
     private byte[] updateLSAHChecksumAndLength(byte[] buffer) {
         //check buffer to be updated contains bytes to be updated, otherwise the method was called with invalid data.
-        if (buffer.length < 20)
+        if (buffer.length < LSA_HEADER_LENGTH)
             StdDaemon.handleDaemonError("RLSA update checksum method was passed an invalid buffer", null);
 
         //length

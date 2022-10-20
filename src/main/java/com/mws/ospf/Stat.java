@@ -18,9 +18,9 @@ public class Stat {
     static int endNoAdjacencies = -1;
     private static long tsStart;
     private static long tsConvergence;
-    private static final LinkedHashMap<Long, Integer> mapListTime = new LinkedHashMap<>();
-    private static final List<Long> cpuTime = new ArrayList<>();
-    private static final List<Long> memUsage = new ArrayList<>();
+    private static final LinkedHashSet<Long> timeOrderedSet = new LinkedHashSet<>();
+    private static final HashMap<Long, Long> cpuTime = new HashMap<>();
+    private static final HashMap<Long, Long> memUsage = new HashMap<>();
     private static final Timer timerStatUpdate = new Timer("Timer-Stat");
     private static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     //endregion STATIC PROPERTIES
@@ -34,14 +34,14 @@ public class Stat {
         //Change poleIntervalMs to change how frequently resource stats are polled
         int pollIntervalMs = 10;
         System.out.println("STATS: Statistics collection started");
-        tsStart = System.nanoTime();
+        tsStart = System.currentTimeMillis();
         recordStat(tsStart);
 
-        //Setup timer, delay and interval of pollIntervalMs. Every tick, call _RecordStat with the current nanotime.
+        //Setup timer, delay and interval of pollIntervalMs. Every tick, call _RecordStat with the current milli time.
         timerStatUpdate.schedule(new TimerTask() {
             @Override
             public void run() {
-                recordStat(System.nanoTime());
+                recordStat(System.currentTimeMillis());
             }
         }, pollIntervalMs, pollIntervalMs);
     }
@@ -52,7 +52,7 @@ public class Stat {
      */
     static void endStats() {
         //get endpoint of statistics
-        tsConvergence = System.nanoTime();
+        tsConvergence = System.currentTimeMillis();
         recordStat(tsConvergence);
 
         //Stop new statistics being recorded
@@ -67,24 +67,21 @@ public class Stat {
 
             FileWriter fwStats = new FileWriter(fileStats, true);
 
-            fwStats.write("timestamp (ns), cpu time (ms), memory usage (KB)" + System.lineSeparator());//Header
+            fwStats.write("timestamp (ms), cpu time (ms), memory usage (KB)" + System.lineSeparator());//Header
             //Store all values. Uses the fact the LinkedHashMap is ordered to make sure data is in the correct output order
-            for (Long ts: mapListTime.keySet()) {
-                int tsV = mapListTime.get(ts);
-                long curCPUT = cpuTime.get(tsV);
-                long curMemU = memUsage.get(tsV);
-                fwStats.write(ts + ", " + curCPUT + ", " + (curMemU / 1000) + System.lineSeparator());
+            for (Long ts: timeOrderedSet) {
+                fwStats.write(ts + ", " + cpuTime.get(ts) + ", " + (memUsage.get(ts) / 1000) + System.lineSeparator());
             }
 
             fwStats.write(System.lineSeparator() +  System.lineSeparator() +", End, Start, Difference" + System.lineSeparator());
-            fwStats.write("Time (ns), " + tsConvergence + ", " + tsStart + ", " + (tsConvergence - tsStart) + System.lineSeparator());
+            fwStats.write("Time (ms), " + tsConvergence + ", " + tsStart + ", " + (tsConvergence - tsStart) + System.lineSeparator());
 
-            long cpuTimeStart = cpuTime.get(mapListTime.get(tsStart));
-            long cpuTimeConvergence = cpuTime.get(mapListTime.get(tsConvergence));
+            long cpuTimeStart = cpuTime.get(tsStart);
+            long cpuTimeConvergence = cpuTime.get(tsConvergence);
             fwStats.write("CPU Time (ms), " + cpuTimeConvergence + ", " + cpuTimeStart + ", " + (cpuTimeConvergence - cpuTimeStart) + System.lineSeparator());
 
-            long memUStart = memUsage.get(mapListTime.get(tsStart));
-            long memUConvergence = memUsage.get(mapListTime.get(tsConvergence));
+            long memUStart = memUsage.get(tsStart);
+            long memUConvergence = memUsage.get(tsConvergence);
             fwStats.write("Mem Usage (KB), " + (memUConvergence / 1000) + ", " + (memUStart / 1000) + ", " + ((memUConvergence - memUStart) / 1000) + System.lineSeparator());
 
             fwStats.close();
@@ -99,14 +96,13 @@ public class Stat {
      * <p>Method called on timerStatUpdate tick. Uses an index value provided to store data collected in arrays. The
      * timestamp index is related to the actual index in the lists via the mapListTime HashMap.</p>
      * <p>Stores the timestamp, CPU time and memory usage</p>
-     * @param timestamp System.nanoTime() at the time of recording statistics. Index in storage for statistics
+     * @param timestamp System.currentTimeMillis() at the time of recording statistics. Index in storage for statistics
      */
     private static void recordStat(long timestamp) {
-        int curStatIndex = mapListTime.size();
-        cpuTime.add(curStatIndex, (osBean.getProcessCpuTime() / 1000000));// div by 1000000 to convert to MS, more accurate to scale of returned value
-        mapListTime.put(timestamp, curStatIndex);
+        timeOrderedSet.add(timestamp);
+        cpuTime.put(timestamp, (osBean.getProcessCpuTime() / 1000000));// div by 1000000 to convert to MS, more accurate to scale of returned value
         Runtime runtime = Runtime.getRuntime();
-        memUsage.add(curStatIndex, runtime.totalMemory() - runtime.freeMemory());
+        memUsage.put(timestamp, runtime.totalMemory() - runtime.freeMemory());
     }
     //endregion STATIC METHODS
 }

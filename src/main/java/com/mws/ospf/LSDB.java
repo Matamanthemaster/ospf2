@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class LSDB {
+class LSDB {
 
     //region OBJECT PROPERTIES
     /**<p><h1>Router LSA List</h1></p>
@@ -37,7 +37,7 @@ public class LSDB {
     }
 
     void setupLocalRLSA() {
-        //Set sequence number. For first time local RLSA, this is the initial sequence number. If the local RLSA already
+        //Set sequence number. For first time local R-LSA, this is the initial sequence number. If the local R-LSA already
         //exists, use that incremented. Also remove the old localRLSA, which is about to be overridden.
         int lsSeqNumber = RLSA.INITIAL_SEQUENCE_NUMBER;
         if (!routerLSAs.isEmpty()) {
@@ -58,14 +58,13 @@ public class LSDB {
             //the last two octets, only copying the short from the int.
             byte[] metric = Ints.toByteArray(neighbour.rIntOwner.getCost());
             metric = new byte[] {metric[2], metric[3]};
-            //Make LinkData object
+
             LinkData localLinkData = new LinkData(
                 neighbour.getRID(), neighbour.ipAddress.toAddressString(), metric
             );
             linkData.add(localLinkData);
         }
 
-        //Link data is now populated, create the local RLSA with it.
         routerLSAs.add(0, new RLSA(lsSeqNumber, linkData));
     }
 
