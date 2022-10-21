@@ -419,8 +419,8 @@ public class StdDaemon {
                     neighbour.lastSentLSAIndex = i - 1;
                     break;
                 }
-                //TODO: should full LSA be exchanged? If yes leave, if no make new summary LSA and add to list.
-                sendLSAList.add(lsa);
+                //TODO: should full LSA be exchanged? If yes add lsa, if no make new summary LSA and add to list (current).
+                sendLSAList.add(new RLSA(lsa.makeRLSAHeaderBuffer()));
             }
             neighbour.lastSentDBD = new DBDPacket(MTU, ++neighbour.lastSentDBD.ddSeqNo, flags, sendLSAList);
             sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
@@ -468,8 +468,8 @@ public class StdDaemon {
                     neighbour.lastSentLSAIndex = i - 1;
                     break;
                 }
-                //TODO: should full LSA be exchanged? If yes leave, if no make new summary LSA and add to list.
-                sendLSAList.add(lsa);
+                //TODO: should full LSA be exchanged? If yes add lsa, if no make new summary LSA and add to list (current).
+                sendLSAList.add(new RLSA(lsa.makeRLSAHeaderBuffer()));
             }
             neighbour.lastSentDBD = new DBDPacket(MTU, neighbour.lastReceivedDBD.ddSeqNo, flags, sendLSAList);
             sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
