@@ -19,12 +19,13 @@ import java.util.*;
  */
 public class StdDaemon {
     //region STATIC PROPERTIES
+    private static final int MTU = 1300;
     static MulticastSocket multicastSocket;
     static InetSocketAddress multicastSocketAddr;
     static Timer timerHelloSend;
-    //Setup thread for hello multicast server
+    static Timer rxmtTimer = new Timer();
     private static final Thread threadStdMulticastListen = new Thread(StdDaemon::receiveMulticastThread, "Thread-Hello-Receive");
-    static final int HEADER_LENGTH = 20;
+    static final int HEADER_LENGTH = 24;
     //endregion
 
     //region STATIC METHODS
@@ -53,6 +54,14 @@ public class StdDaemon {
                 sendHelloPackets();
             }
         }, 0, 10 * 1000);
+
+        //Retransmission timer
+        rxmtTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                rtmxRetransmit();
+            }
+        }, 5000, 5000);// "Sample value for a local area network: 5 seconds."
 
     }
 
@@ -119,6 +128,50 @@ public class StdDaemon {
         }
     }
 
+    /**<p><h1>Send Packet to Neighbour</h1></p>
+     * <p>After the hello protocol, send a provided datagram packet to a specified neighbour over the multicast
+     * interface. The sent packet will be directional. The full buffer should be passed to this method.</p>
+     * @param neighbour neighbour to direct a packet to
+     * @param packet a DatagramPacket containing the data to send, length and the return socket information
+     */
+    static void sendPacketToNeighbour(NeighbourNode neighbour, DatagramPacket packet) {
+        try {
+            multicastSocket.setNetworkInterface(neighbour.rIntOwner.toNetworkInterface());
+            multicastSocket.send(packet);
+        } catch (SocketException ex) {
+            handleDaemonError("SocketException when sending a packet to neighbour", ex);
+        } catch (IOException ex) {
+            handleDaemonError("IOException when sending a packet to neighbour", ex);
+        }
+    }
+
+    /**<p><h1>Rtmx Timer Expire</h1></p>
+     * <p>Fired every rtmxInterval seconds. Called by the rtmx timer. Depending on state, try and retransmit packets that
+     * have been sent, if no response has been seen.</p>
+     */
+    static void rtmxRetransmit() {
+        for (NeighbourNode neighbour: Config.neighboursTable) {
+            switch (neighbour.getState()) {
+                case EXSTART -> {
+                    /*In ExStart, master has not been negotiated. Retransmit negotiation packet if it still exists as
+                    the last sent packet*/
+                    if (neighbour.lastSentDBD != null) {
+                        sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                                neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+                    }
+                }
+                case EXCHANCE -> {
+                    /*In Exchange, master has been negotiated. Retransmit negotiation packet if it still exists as
+                    the last sent packet, and only if this packet is the master*/
+                    if (neighbour.lastSentDBD != null && !neighbour.isMaster) {
+                        sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                                neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+                    }
+                }
+            }
+        }
+    }
+
     /**<p><h1>Standard Multicast Receive Handle Method</h1></p>
      * <p>Method implemented as a thread to receive an packet from any network joined to the multicast group. A thread
      * is required as the receive method is blocking.</p>
@@ -166,7 +219,10 @@ public class StdDaemon {
             //Branch, pass to packet processor for each specific packet type.
             switch (packetBuffer[1]) {
                 case 0x01 -> processHelloPacket(neighbour, neighbourRID, pSource, packetBuffer);
-                case 0x02 -> processDBDPacket(neighbour, pSource, packetBuffer);
+                case 0x02 -> {
+                    assert neighbour != null;
+                    processDBDPacket(neighbour, packetBuffer);
+                }
             }
         }
     }
@@ -274,28 +330,169 @@ public class StdDaemon {
         /*If in init state and this neighbour reports to know of this current node, this is the conditions for the
         2WayReceived event. Trigger it*/
         if (neighbour.getState() == ExternalStates.INIT && neighbour.knownNeighbours.contains(Config.thisNode.getRID()))
-            twoWayReceivedEvent(neighbour);
+            evTwoWayReceived(neighbour);
     }
 
-    private static void processDBDPacket(NeighbourNode neighbour, IPAddress pSource, byte[] packetBuffer) {
-        //On first
-        if (neighbour.lastSentDBD == null) {
+    /**<p><h1>StdDaemon Process DBD packet</h1></p>
+     * <p>Process a validated DBD packet received on the multicast socket. This method passes data received to correct
+     * methods. The method manages the process flow for DBD packets, including process flows for master and slave nodes
+     * </p>
+     * @param neighbour scraped neighbour to manipulate, from NeighbourNode.getNeighbourNodeByRID
+     * @param packetBuffer raw, but manipulated and validated  packet buffer
+     */
+    private static void processDBDPacket(NeighbourNode neighbour, byte[] packetBuffer) {
+        //TODO: Test method
+        //TODO: Add Javadocs
+        neighbour.lastReceivedDBD = new DBDPacket(packetBuffer);
 
+        //On init packet following RFC init packet rules, set master node based on highest RID, set state, MS begin
+        //exchange.
+        if (neighbour.lastReceivedDBD.isFirstPacket() && neighbour.lastReceivedDBD.listLSAs.size() == 0
+        && neighbour.getState().equals(ExternalStates.EXSTART)) {
+            neighbour.isMaster = neighbour.getRIDAsInt() > Config.thisNode.getRIDAsInt();
+            neighbour.setState(ExternalStates.EXCHANCE);
+        }
+
+        //Only continue processing if in exchange (negotiation done event, or during exchange packet receive).
+        if (neighbour.getState() != ExternalStates.EXCHANCE)
+            return;
+
+        /*By this point, ExStart negotiation is done. Possible branches are:
+        Validate LSAs
+        Store LSAs
+        1.1) Master with more data to send.
+        1.2) Master with no more data to send, but more to receive.
+        1.3) Master with no more data to send or receive (end).
+        1.4) Master retransmit the last sent DBD if receives slave's last DBD already received in duplicate.
+        2.1) Slave with more data to send.
+        2.2) Slave with no more data to send, but poll response to send.
+        2.3) Slave end condition (no more data to request, and no
+        2.4) If the received DBD packet sequence number matches the last sent packet sequence number, retransmit.
+        For both branches, validate and save LSAs
+        */
+
+        //3)
+
+        //1)
+        if (!neighbour.isMaster) {
+            //1.4) Sequence number received is the last sent.
+            if (neighbour.lastReceivedDBD.ddSeqNo == neighbour.lastSentDBD.ddSeqNo - 1) {
+                sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                        neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+                return;
+            }
+
+            //Verify DBD from slave was valid. Drop packet as it is wrong.
+            if (neighbour.lastReceivedDBD.ddSeqNo != neighbour.lastSentDBD.ddSeqNo) {
+                Launcher.printToUser("Last received DBD packet from slave had invalid sequence number");
+                return;
+            }
+
+            //Now packet was verified, save data
+            neighbour.lsaRequestList.addAll(neighbour.lastReceivedDBD.listLSAs);
+
+            //1.3) If no more data to send, send end through evNegotiationDone.
+            if (!neighbour.lastSentDBD.isMoreBitSet() && !neighbour.lastReceivedDBD.isMoreBitSet()) {
+                evExchangeDone(neighbour);
+                return;
+            }
+
+            //1.2) Has more data to receive, but none to send. Send new poll without LSA data.
+            if (!neighbour.lastSentDBD.isMoreBitSet() && neighbour.lastReceivedDBD.isMoreBitSet()) {
+                neighbour.lastSentDBD = new DBDPacket(MTU, ++neighbour.lastSentDBD.ddSeqNo, (byte) 0x01, null);
+                sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                        neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+                return;
+            }
+
+            //TODO: how does OSPF work with multiple exchanges working at the same time? Would more exchange need to take place to reflect new LSAs on the neighbours?
+            //1.1) Have more data to send. Create LSA with more data.
+            int maxNoData = (MTU - HEADER_LENGTH) - DBDPacket.DBD_HEADER_LENGTH;//Counter, determine if over MTU
+            byte flags = 0x01;//MS bit;
+            List<RLSA> sendLSAList = new ArrayList<>();
+            for (int i = neighbour.lastSentLSAIndex; i < Config.lsdb.routerLSAs.size(); i++) {
+
+                RLSA lsa = Config.lsdb.routerLSAs.get(i);
+                maxNoData -= lsa.getLength();//Take LSA length away from MTU budget. If over budget, don't add and set M
+                if (maxNoData < 0) {
+                    flags = (byte) (flags | 0x02);//Add M bit
+                    neighbour.lastSentLSAIndex = i - 1;
+                    break;
+                }
+                //TODO: should full LSA be exchanged? If yes leave, if no make new summary LSA and add to list.
+                sendLSAList.add(lsa);
+            }
+            neighbour.lastSentDBD = new DBDPacket(MTU, ++neighbour.lastSentDBD.ddSeqNo, flags, sendLSAList);
+            sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                    neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+        }
+        else {
+            //2)
+            //2.4) Slave retransmit bad packet.
+            if (neighbour.lastReceivedDBD.ddSeqNo == neighbour.lastSentDBD.ddSeqNo) {
+                sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                        neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+                return;
+            }
+
+            if (neighbour.lastReceivedDBD.ddSeqNo != neighbour.lastSentDBD.ddSeqNo + 1) {
+                Launcher.printToUser("Last received DBD packet from master had unexpected sequence number");
+                return;
+            }
+
+            //Now validated, store LSAs
+            neighbour.lsaRequestList.addAll(neighbour.lastReceivedDBD.listLSAs);
+
+            //2.2) respond to master's poll with no more data
+            if (!neighbour.lastSentDBD.isMoreBitSet()) {
+                neighbour.lastSentDBD = new DBDPacket(MTU, neighbour.lastReceivedDBD.ddSeqNo, (byte) 0x00, null);
+                sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                        neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+
+                //2.3) End condition for slave. Slave M bit is not set, and the current packet more bit wasn't set.
+                if (!neighbour.lastReceivedDBD.isMoreBitSet())
+                    evExchangeDone(neighbour);
+                return;
+            }
+
+
+            //2.1) respond to master's poll with more data
+            int maxNoData = (MTU - HEADER_LENGTH) - DBDPacket.DBD_HEADER_LENGTH;//Counter, determine if over MTU
+            byte flags = 0x00;//No MS bit;
+            List<RLSA> sendLSAList = new ArrayList<>();
+            for (int i = neighbour.lastSentLSAIndex; i < Config.lsdb.routerLSAs.size(); i++) {
+                RLSA lsa = Config.lsdb.routerLSAs.get(i);
+                maxNoData -= lsa.getLength();//Take LSA length away from MTU budget. If over budget, don't add and set M
+                if (maxNoData < 0) {
+                    flags = (byte) (flags | 0x02);//Add M bit
+                    neighbour.lastSentLSAIndex = i - 1;
+                    break;
+                }
+                //TODO: should full LSA be exchanged? If yes leave, if no make new summary LSA and add to list.
+                sendLSAList.add(lsa);
+            }
+            neighbour.lastSentDBD = new DBDPacket(MTU, neighbour.lastReceivedDBD.ddSeqNo, flags, sendLSAList);
+            sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                    neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+
+            //2.3) End condition for slave. Both Master and slave more bit not set.
+            if (!neighbour.lastReceivedDBD.isMoreBitSet() && !neighbour.lastSentDBD.isMoreBitSet())
+                evExchangeDone(neighbour);
         }
     }
 
     /**<p><h1>Standard 2WayReceived Event</h1></p>
      * <p>On neighbour state Init, if a node receives a hello packet with its own RID echoed, the event 2WayReceived is
      * fired. This method is the trigger for the exchange protocol to start for the neighbour node.</p>
-     * @param neighbourNode node that has had the 2WayReceived event trigger
+     * @param neighbour node that has had the 2WayReceived event trigger
      */
-    private static void twoWayReceivedEvent(NeighbourNode neighbourNode) {
+    private static void evTwoWayReceived(NeighbourNode neighbour) {
         //Quick sanity check TwoWayReceived did occur
-        if (neighbourNode.getState() != ExternalStates.INIT)
+        if (neighbour.getState() != ExternalStates.INIT)
             return;
 
         //Set Correct state for event
-        neighbourNode.setState(ExternalStates.EXSTART);
+        neighbour.setState(ExternalStates.EXSTART);
 
         //Refresh the local LSA, which will add the new neighbour
         Config.lsdb.setupLocalRLSA();
@@ -303,16 +500,23 @@ public class StdDaemon {
         //TODO: Investigate if full LSAs could be exchanged under specification.
         //TODO: Test send code.
         //TODO: Make receive code.
-        neighbourNode.lastSentDBD = new DBDPacket(1300, 0, (byte) 0x07, null);
-        try {
-            multicastSocket.setNetworkInterface(neighbourNode.rIntOwner.toNetworkInterface());
-            DatagramPacket packet = new DatagramPacket(neighbourNode.lastSentDBD.packetBuffer, neighbourNode.lastSentDBD.packetBuffer.length, multicastSocketAddr);
-            multicastSocket.send(packet);
-        } catch (SocketException ex) {
-            handleDaemonError("SocketException when sending first DBD packet to neighbour", ex);
-        } catch (IOException ex) {
-            handleDaemonError("IOException when sending first DBD packet to neighbour", ex);
-        }
+        neighbour.lastSentDBD = new DBDPacket(MTU, new Random().nextInt(), (byte) 0x07, null);
+        sendPacketToNeighbour(neighbour, new DatagramPacket(neighbour.lastSentDBD.packetBuffer,
+                neighbour.lastSentDBD.packetBuffer.length, multicastSocketAddr));
+    }
+
+    /**<p><h1>Standard Exchange Done Event</h1></p>
+     * <p>Once the DBD exchange is complete, and both nodes have received all DBD packets from one another, call this
+     * event method.</p>
+     * @param neighbour node that has had the NegotiationDone event triggered
+     */
+    private static void evExchangeDone(NeighbourNode neighbour) {
+        //Quick sanity test
+        if (neighbour.getState() != ExternalStates.EXCHANCE)
+            return;
+
+        //Set Correct state for event
+        neighbour.setState(ExternalStates.LOADING);
 
         //Current future method
         //Statistics Endpoint test

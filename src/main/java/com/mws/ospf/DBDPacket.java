@@ -31,13 +31,19 @@ import static com.mws.ospf.RLSA.LSA_HEADER_LENGTH;
  *
  */
 class DBDPacket {
+    //region STATIC CONSTANTS
     static final int DBD_HEADER_LENGTH = 8;
+    //endregion STATIC CONSTANTS
+
+    //region OBJECT PROPERTIES
     public int ddSeqNo;
     public byte dbdFlags;
     public List<RLSA> listLSAs = new ArrayList<>();
     private int mtu;
     final byte[] packetBuffer;
+    //endregion OBJECT PROPERTIES
 
+    //region OBJECT METHODS
     /**<p><h1>Construct DBDPacket from Local Data</h1></p>
      * <p>Construct an OSPF DBD packet from local data stored on this node, using predefined LSAs. This constructor is
      * useful when creating a DBD packet to send, and storing the last sent packet.</p>
@@ -87,30 +93,59 @@ class DBDPacket {
         } catch (ArithmeticException ex) {
             Launcher.printToUser("An R-LSA from a received DBD packet was malformed at offset " + offset + ": " +
                     ex.getMessage());
+            ex.printStackTrace();
             Launcher.printBuffer(strippedPacketBuffer);
         } catch (IllegalArgumentException ex) {
             Launcher.printToUser("An R-LSA in a received DBD packet was invalid at offset " + offset + ": " +
                     ex.getMessage());
+            ex.printStackTrace();
             Launcher.printBuffer(strippedPacketBuffer);
         } catch (IndexOutOfBoundsException ex) {
             Launcher.printToUser("DBD packet received from a neighbour was invalid. The offsets in the LSAs did not" +
                     "match up with the packet length: offset=" + offset + ",length=" + strippedPacketBuffer.length);
+            ex.printStackTrace();
             Launcher.printBuffer(strippedPacketBuffer);
         }
     }
 
+    /**<p><h1>Is MS Bit Set</h1></p>
+     * <p>Is the master bit in this DBD packet set? This flag determines the sending node is declaring itself master.</p>
+     * @return true if MS is set
+     */
     public boolean isMSBitSet() {
         return (dbdFlags & 0x01) > 0;
     }
 
+    /**<p><h1>Is M Bit Set</h1></p>
+     * <p>Is the more bit in this DBD packet set? This flag determines if the sending node has more data to send.</p>
+     * @return true if M is set
+     */
     public boolean isMoreBitSet() {
         return (dbdFlags & 0x02) > 0;
     }
 
+    /**<p><h1>Is I Bit Set</h1></p>
+     * <p>Is the init bit in this DBD packet set? This flag determines the sender is initiating an exchange.</p>
+     * @return true if I is set
+     */
     public boolean isInitBitSet() {
         return (dbdFlags & 0x04) > 0;
     }
 
+    /**<p><h1>Is This DBD First</h1></p>
+     * <p>The first DBD packet has MS, M and I set. Determine if all 3 bits are set.</p>
+     * @return true if MS, M and I are set
+     */
+    public boolean isFirstPacket() {
+        return isMSBitSet() && isMoreBitSet() && isInitBitSet();
+    }
+
+    /**<p><h1>Make DBD Packet</h1></p>
+     * <p>Makes a DBD packet buffer from the data stored in this object. The data can be sent to an adjacent node. This
+     * method is only callable by this class, in the constructor for the object, as it populates final byte[]
+     * packetBuffer. The DBD data will never change after creation of the packet. It is set in stone.</p>
+     * @return a fully complete DBD packet byte buffer
+     */
     private byte[] makeDBDPacket() {
         byte[] buffer;
 
@@ -149,4 +184,5 @@ class DBDPacket {
 
         return StdDaemon.updateChecksumAndLength(buffer);
     }
+    //endregion OBJECT METHODS
 }

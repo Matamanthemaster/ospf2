@@ -59,6 +59,16 @@ public abstract class Node {
         return this.rid;
     }
 
+    /**<p><h1>Get RID as int</h1></p>
+     * <p>Converts the RID IPAddressString to a binary string, which is parsed to an integer, with perserved MSB and LSB.
+     * The bigger the RID, the bigger the number. The method is useful for comparing which RID is bigger.</p>
+     * @return an integer representing the RID, from a binary string
+     * @throws NumberFormatException if the node rid is not a number.
+     */
+    public int getRIDAsInt() {
+        return Integer.parseInt(rid.getAddress().toBinaryString(), 2);
+    }
+
     /**<p><h1>Get Known Neighbours String</h1></p>
      * <p>Returns a list of known neighbours as a comma separated string list. If no known neighbours exist, an empty
      * string is returned</p>

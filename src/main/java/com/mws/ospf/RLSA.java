@@ -195,7 +195,6 @@ class RLSA {
 
         if (!isChecksumCorrect(lsaBuffer))
             throw new ArithmeticException("The checksum in the provided buffer is invalid");
-
         if (lsaBuffer.length != ((lsaBuffer[18] << 8) | lsaBuffer[19]))
             throw new ArithmeticException("The buffer length does not match the header length ");
 
@@ -288,6 +287,16 @@ class RLSA {
     boolean isThisLSANewer(RLSA checkLSA) {
         //true if this.lsAge is newer or the same as the test. False if lsAge is newer.
         return checkLSA.lsAge < this.lsAge;
+    }
+
+    /**<p><h1>Get the LSA Byte Length</h1></p>
+     * <p>Returns the number of bytes for this LSA. This will be the constant header length, plus 12 bytes per link data
+     * object stored. For summary LSAs, this will only be the LSA header length as there is no link data stored. For a
+     * full LSA with link data, all data will be added</p>
+     * @return number of bytes the resulting buffer will contain
+     */
+    int getLength() {
+        return LSA_HEADER_LENGTH + (links.size() * LINK_DATA_SIZE);
     }
 
     /**<p><h1>Make Router LSA Header Buffer</h1></p>

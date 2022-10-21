@@ -4,6 +4,8 @@ import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
 import javafx.scene.control.Tab;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -48,6 +50,9 @@ public class NeighbourNode extends Node {
     Timer timerInactivity;
     DBDPacket lastSentDBD;
     DBDPacket lastReceivedDBD;
+    List<RLSA> lsaRequestList = new ArrayList<>();
+    int lastSentLSAIndex = 0;
+    boolean isMaster = false;
     private boolean flagTimerInactRunning = false;
     Tab tab;
     //endregion
@@ -121,6 +126,8 @@ public class NeighbourNode extends Node {
         this.enParam = null;
         this.lastSentDBD = null;
         this.lastReceivedDBD = null;
+        this.lastSentLSAIndex = 0;
+        this.lsaRequestList.clear();
         Launcher.printToUser("Dead timer expired: " + this.getRID());
 
         //Update neighbours on topology change
