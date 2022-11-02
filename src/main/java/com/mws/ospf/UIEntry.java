@@ -11,7 +11,7 @@ import java.io.IOException;
  * <p>Class is entry point to JavaFX GUI component of the artefact. Launcher class calls main if the artefact is to use
  * the GUI</p>
  */
-public class UIEntry extends Application {
+class UIEntry extends Application {
     /**<p><h1>UI Entry Main</h1></p>
      * <p>Entrypoint of the GUI application, calls javafx method to create a javafx stage, and eventually call start</p>
      * @param args arguments to be passed
@@ -30,7 +30,7 @@ public class UIEntry extends Application {
     public void start(Stage primaryStage) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(UIEntry.class.getResource("controlUI.fxml"));
         Scene scene = new Scene(fxmlLoader.load(), 320, 240);
-        primaryStage.setTitle("[OSPFv" + (Launcher.operationMode.equals("standard") ? "2":"4") +
+        primaryStage.setTitle("[OSPFv" + Launcher.operationMode +
                 "@" + Config.thisNode.hostname+ "]");
         primaryStage.setScene(scene);
         primaryStage.show();

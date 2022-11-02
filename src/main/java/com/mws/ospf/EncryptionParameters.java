@@ -16,7 +16,7 @@ import static com.mws.ospf.StdDaemon.handleDaemonError;
  * <p>Class to store a secret key derived from Diffie-Hellman. Provides methods to use the key in encryption and
  * decryption of byte buffers, for each individual NeighbourNode.</p>
  */
-public class EncryptionParameters {
+class EncryptionParameters {
     //region OBJECT PROPERTIES
     private final SecretKey sharedSecret;
     //endregion OBJECT PROPERTIES
@@ -32,20 +32,24 @@ public class EncryptionParameters {
     }
 
     /**<p><h1>Encrypt Data with Key</h1></p>
-     * <p>Method converts cleartext to AES ciphertext, using a key and a generated IV parameter.</p>
+     * <p>Method converts a packets data from cleartext to AES ciphertext, using a key and a generated IV parameter.
+     * The method expects there to be an OSPF header, and will try to encrypt only the data payload section.</p>
      * <p>The method handles its own exceptions.</p>
-     * @param data data to be encrypted with the AES secret key
-     * @return the original data encrypted with AES and the secret key. Appended in the first 18 bytes is also the IV
+     * @param packet a packet budder containing the OSPF header and data to be encrypted with the AES secret key
+     * @return the original packet encrypted with AES and the secret key. Appended in the first 18 bytes is also the IV
      * parameter for decrypting the message
      */
-    byte[] encrypt(byte[] data) {
+    byte[] encrypt(byte[] packet) {
         try {
+            //Split packet into predefined blocks of packet. Blocks include OSPF header and packet
+            byte[] ospfHeader = Arrays.copyOf(packet, StdDaemon.HEADER_LENGTH);
+            byte[] data = Arrays.copyOfRange(packet, StdDaemon.HEADER_LENGTH, packet.length);
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             cipher.init(Cipher.ENCRYPT_MODE, sharedSecret);
 
             byte[] aesParams = cipher.getParameters().getEncoded();
-            byte[] ciphertext = cipher.doFinal(data);
-            return Bytes.concat(aesParams, ciphertext);
+            data = cipher.doFinal(data);
+            return Bytes.concat(ospfHeader, aesParams, data);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException ex) {
             // Ex on code:  Cipher.getInstance("AES/CBC/PKCS5Padding");
             StdDaemon.handleDaemonError("UNLIKELY EXCEPTION: Encryption: NoSuchAlgorithm / NoSuchPadding  \"AES/CBC/PKCS5Padding\"", ex);
@@ -70,17 +74,17 @@ public class EncryptionParameters {
      * first 18 bits to include an encoded IV parameter, from the encryption method of the neighbour node, to point at
      * where to start decryption.</p>
      * <p>The method handles its own exceptions.</p>
-     * @param data data + IV parameters to be decrypted with the AES secret key
-     * @return the original data decrypted, with standard OSPF header and trailing decrypted data
+     * @param packet a packet buffer containing an OSPF header, IV parameters and encrypted packet to be decrypted with
+     *               the AES secret key
+     * @return the original packet decrypted, with standard OSPF header and trailing decrypted packet
      */
-    byte[] decrypt(byte[] data) {
+    byte[] decrypt(byte[] packet) {
         try {
             AlgorithmParameters aesParams = AlgorithmParameters.getInstance("AES");
-            //Split data into predefined blocks of data. Blocks include OSPF header, IV params and encrypted data
-            //0-23 (24 bytes) inclusive, header. 24-41 (18 bytes) inclusive, IV params. 42-end, encrypted data.
-            byte[] ospfHeader = Arrays.copyOfRange(data, 0, 24);
-            aesParams.init(Arrays.copyOfRange(data, 24, 42));
-            byte[] encryptedData = Arrays.copyOfRange(data, 42, data.length);
+            //Split packet into predefined blocks of packet. Blocks include OSPF header, IV params and encrypted packet
+            byte[] ospfHeader = Arrays.copyOf(packet, StdDaemon.HEADER_LENGTH);
+            aesParams.init(Arrays.copyOfRange(packet, StdDaemon.HEADER_LENGTH, 42));
+            byte[] encryptedData = Arrays.copyOfRange(packet, 42, packet.length);
 
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             cipher.init(Cipher.DECRYPT_MODE, sharedSecret, aesParams);
@@ -95,7 +99,7 @@ public class EncryptionParameters {
             // Ex on code:  Cipher.getInstance("AES/CBC/PKCS5Padding");
             handleDaemonError("UNLIKELY EXCEPTION: Decryption: NoSuchPadding \"PKCS5Padding\"", ex);
         } catch (IllegalBlockSizeException | BadPaddingException ex) {
-            // Ex on code:  cipherDecrypt.doFinal(data);
+            // Ex on code:  cipherDecrypt.doFinal(packet);
             handleDaemonError("Decryption: Illegal block size or bad padding when decrypting buffer", ex);
         } catch (IOException ex) {
             // Ex on code:  aesParams.init()

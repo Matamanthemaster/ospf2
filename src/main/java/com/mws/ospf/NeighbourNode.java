@@ -14,7 +14,7 @@ import java.util.TimerTask;
  * specifics for direct communication with this node.</p>
  * <p>Static methods exist as helpers</p>
  */
-public class NeighbourNode extends Node {
+class NeighbourNode extends Node {
     //region STATIC METHODS
     /**<p><h1>Get Reference of Neighbour from RID</h1></p>
      * <p>Searches neighbours table list to find a specific instance of a neighbour that has been previously
@@ -48,12 +48,14 @@ public class NeighbourNode extends Node {
     final RouterInterface rIntOwner;
     EncryptionParameters  enParam;
     Timer timerInactivity;
+    Timer timerRxmt;
     DBDPacket lastSentDBD;
     DBDPacket lastReceivedDBD;
     List<RLSA> lsaRequestList = new ArrayList<>();
     int lastSentLSAIndex = 0;
     boolean isMaster = false;
     private boolean flagTimerInactRunning = false;
+    private boolean flagTimerRmxtRunning = false;
     Tab tab;
     //endregion
 
@@ -89,6 +91,35 @@ public class NeighbourNode extends Node {
         }, 40*1000);
 
         flagTimerInactRunning = true;
+    }
+
+    /**<p><h1>Reset rxmt Timer</h1></p>
+     * <p>Call to reset the retransmission timer, meaning that the interval for retransmission will be reset. This
+     * method is called by the send method in StdDaemomn to reset retransmission each time a packet is sent.</p>
+     */
+    void resetRxmtTimer() {
+        if (flagTimerRmxtRunning)
+            timerRxmt.cancel();
+
+        timerRxmt = new Timer(this.getRID() + "-rxmtTimer");
+        timerRxmt.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                expireRxmtTimer();
+            }
+        }, 5000, 5000);// "Sample value for a local area network: 5 seconds."
+
+        flagTimerRmxtRunning = true;
+    }
+
+    /**<p><h1>Cancel rxmt Timer</h1></p>
+     * <p>After the final packet has been acknowledged, cancel the rxmt retransmission timer</p>
+     */
+    void cancelRxmtTimer() {
+        if (flagTimerRmxtRunning) {
+            timerRxmt.cancel();
+            flagTimerRmxtRunning = false;
+        }
     }
 
     /**<p><h1>Get Neighbour State</h1></p>
@@ -131,9 +162,9 @@ public class NeighbourNode extends Node {
         Launcher.printToUser("Dead timer expired: " + this.getRID());
 
         //Update neighbours on topology change
-        if (Launcher.operationMode.equals("standard"))
+        if (Launcher.operationMode == 0x02)
             StdDaemon.sendHelloPackets();
-        if (Launcher.operationMode.equals("encrypted")) {
+        if (Launcher.operationMode == 0x04) {
             EncDaemon.sendHelloPackets();
 
             //Also for encrypted nodes, begin DHKeyExchange again (Assumes p2p network)
@@ -142,6 +173,30 @@ public class NeighbourNode extends Node {
 
         //Refresh the local LSA.
         Config.lsdb.setupLocalRLSA();
+    }
+
+    /**<p><h1>rxmt Timer Expire</h1></p>
+     * <p>Called on expiry of the rxmt timer. Called by the rxmt timer schedule runnable method. This method on call
+     * will attempt to retransmit the last packet which has not been acknowledged.</p><p></p>
+     * <p>At this stage, only the DBD packets are retransmitted.</p>
+     */
+    void expireRxmtTimer() {
+        switch (this.getState()) {
+            case EXSTART -> {
+                    /*In ExStart, master has not been negotiated. Retransmit negotiation packet if it still exists as
+                    the last sent packet*/
+                if (this.lastSentDBD != null) {
+                    StdDaemon.sendPacketToNeighbour(this, this.lastSentDBD.packetBuffer);
+                }
+            }
+            case EXCHANCE -> {
+                    /*In Exchange, master has been negotiated. Retransmit negotiation packet if it still exists as
+                    the last sent packet, and only if this packet is the master*/
+                if (this.lastSentDBD != null && !this.isMaster) {
+                    StdDaemon.sendPacketToNeighbour(this, this.lastSentDBD.packetBuffer);
+                }
+            }
+        }
     }
     //endregion
 }

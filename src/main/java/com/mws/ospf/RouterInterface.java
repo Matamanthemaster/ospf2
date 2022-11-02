@@ -14,7 +14,7 @@ import java.util.List;
  * <p>This node has several router interfaces OSPF will work over. An interface has a name, that is used in the OS.
  * each node also has an IP that is also used in the OS.</p>
  */
-public class RouterInterface {
+class RouterInterface {
     //region STATIC PROPERTIES
     private static final List<RouterInterface> _RouterInterfaces = new ArrayList<>();
     private static final long REFERENCE_BANDWIDTH = InterfaceType.E100BASET.getBandwidth();

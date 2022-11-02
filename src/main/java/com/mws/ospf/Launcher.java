@@ -12,7 +12,7 @@ import java.util.TimerTask;
  * <p>Entrypoint into the application. Contains process flow to start application, via checking flags, setting up
  * the configuration class and creating a thread for the main process flow daemon being tested</p>
  */
-public class Launcher {
+class Launcher {
     //region STATIC PROPERTIES
     private final static String commandUsage =
             "Usage: java -jar ospf.jar [arguments] <Operation Mode Flag>" + System.lineSeparator() +
@@ -29,7 +29,7 @@ public class Launcher {
                     "   --Encrypted-OSPF" + System.lineSeparator();
     private static Thread uiThread;
     private static Thread daemonThread;
-    static String operationMode;
+    static byte operationMode;
     static boolean flagWait;
     static boolean flagStart;
     //endregion
@@ -52,13 +52,13 @@ public class Launcher {
             Config.setConfig();
 
         //Entry point for CLI daemon.
-        if (operationMode == null)
+        if (operationMode == 0)
             handleLauncherError("Operation mode not specified.");
 
         //Check operation mode from flags, choose appropriate implementation for the PF model.
-        if (operationMode.equals("standard"))
+        if (operationMode == 0x02)
             daemonThread = new Thread(StdDaemon::main, "Thread-Daemon-StandardOSPF");
-        else if (operationMode.equals("encrypted"))
+        else if (operationMode == 0x04)
             daemonThread = new Thread(EncDaemon::main, "Thread-Daemon-EncryptedOSPF");
         else
             handleLauncherError("Could not create a daemon thread. Launcher.operationMode is null.");
@@ -141,16 +141,16 @@ public class Launcher {
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--Standard-OSPF" -> {
-                    if (!(operationMode == null))
+                    if (!(operationMode == 0))
                         handleLauncherError("Cannot use multiple operation modes");
 
-                    operationMode = "standard";
+                    operationMode = 0x02;
                 }
                 case "--Encrypted-OSPF" -> {
-                    if (!(operationMode == null))
+                    if (!(operationMode == 0))
                         handleLauncherError("Cannot use multiple operation modes");
 
-                    operationMode = "encrypted";
+                    operationMode = 0x04;
                 }
                 case "--help", "-help" -> { //Request to see command usage
                     System.out.println(commandUsage);
@@ -231,7 +231,7 @@ public class Launcher {
      * @param message message to be displayed
      */
     static void printToUser(String message) {
-        System.out.print("[OSPFv" + (operationMode.equals("standard") ? "2":"4"));
+        System.out.print("[OSPFv" + operationMode);
         System.out.print("@" + Config.thisNode.hostname + "]: ");
         System.out.println(message);
     }

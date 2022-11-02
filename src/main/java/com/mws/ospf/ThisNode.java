@@ -8,7 +8,7 @@ import java.util.List;
  * <p>An instance of Node that represents the specific node the code is running on. Contains a list of all router
  * interfaces, which this node doesn't need to know about neighbour nodes.</p>
  */
-public class ThisNode extends Node {
+class ThisNode extends Node {
     //region OBJECT PROPERTIES
     List<RouterInterface> interfaceList;
     String hostname;

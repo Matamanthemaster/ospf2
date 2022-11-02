@@ -12,6 +12,50 @@ import java.util.List;
 
 import static com.mws.ospf.LinkData.LINK_DATA_SIZE;
 
+/*Stripped LSA header
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |            LS age             |    Options    |    LS type    |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                        Link State ID                          |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                     Advertising Router                        |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                     LS sequence number                        |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |         LS checksum           |             length            |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+
+       Stripped RLSA header
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |            LS age             |     Options   |       1       |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                        Link State ID                          |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                     Advertising Router                        |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                     LS sequence number                        |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |         LS checksum           |             length            |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |    0    |V|E|B|        0      |            # links            |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                          Link ID                              |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                         Link Data                             |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |     Type      |     # TOS     |            metric             |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                              ...                              |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |      TOS      |        0      |          TOS  metric          |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                          Link ID                              |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                         Link Data                             |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ */
+
 /**<p><h1>Type 1 LSA</h1></p>
  * <p>A type 1 (Router) LSA. LSAs store data for the LSDB, and being sent via LSU packets. The class is used to store
  * an LSA on the node, formatted data, and contains methods to convert it to a either a full LSU buffer, or DBD summary</p>
@@ -19,7 +63,6 @@ import static com.mws.ospf.LinkData.LINK_DATA_SIZE;
  * of LSA. For this project in the current state, a single class is all that is required.</p>
  */
 class RLSA {
-    //TODO: DBD exchange
     //region STATIC CONSTANTS
     static final int INITIAL_SEQUENCE_NUMBER = 0x80000001;
     static final int MAX_SEQUENCE_NUMBER = 0x7fffffff;
@@ -44,16 +87,15 @@ class RLSA {
      * @return whether the checksum field in the header matches the
      * @throws IllegalArgumentException if the lsa buffer didn't contain an LSA header
      */
-    static boolean isChecksumCorrect(byte[] lsaBuffer) {
+     private static boolean isChecksumCorrect(byte[] lsaBuffer) {
         if (lsaBuffer.length < LSA_HEADER_LENGTH)
             throw new IllegalArgumentException("The LSA buffer provided doesn't meet the size requirement for the LSA" +
                     " header, and so the LSA is invalid");
 
         //Store original checksum
-        int checksum = (lsaBuffer[16] << 8) | lsaBuffer[17];
+        int checksum = (((lsaBuffer[16] << 8) & 0xff00) | (lsaBuffer[17] & 0xff));
 
-        //Remove checksum and lsage from checksum calculation, check checksum and return if matching.
-        lsaBuffer[0] = lsaBuffer[1] = lsaBuffer[16] = lsaBuffer[17] = 0x00;
+        //check checksum and return if matching.
         return checksum == fletcherChecksum16(lsaBuffer);
     }
 
@@ -63,7 +105,10 @@ class RLSA {
      * @param buffer buffer to operate on, which the checksum is calculated for
      * @return the calculated checksum as a short stored in an int
      */
-    static int fletcherChecksum16(byte[] buffer) {
+     private static int fletcherChecksum16(byte[] buffer) {
+        //Remove checksum and lsage from checksum calculation
+        buffer[0] = buffer[1] = buffer[16] = buffer[17] = 0;
+
         //Starting variables
         int C0 = 0, C1 = 0;
 
@@ -75,13 +120,10 @@ class RLSA {
         }
 
         //C1 + C0 in place of setting n+0 and n+1. Allows same method to make and check the checksum.
-        return (C0 << 8) | C1;
+        return (((C0 << 8) & 0xff00) | C1) & 0x0000ffff;
     }
     //endregion STATIC METHODS
 
-    //TODO: Change access rights
-    //TODO: Change access rights for LSDB
-    //TODO: Check access rights for classes? Should they all be public?
     //region OBJECT PROPERTIES
     /**<p><h1>14.  Aging The Link State Database</h1></p>
      * <p>
@@ -116,7 +158,7 @@ class RLSA {
      *     restarted.
      * </p>
      */
-    int lsAge;
+    private int lsAge;
     /**<p><h1>LSA lsID</h1></p>
      * <p>
      *             This field identifies the piece of the routing domain that
@@ -126,7 +168,7 @@ class RLSA {
      * </p><p></p>
      * <p>For ls type 1: The originating router's Router ID.</p>
      */
-    IPAddressString lsID;
+    private final IPAddressString lsID;
     /**<p><h1>LSA Advertising Router</h1></p>
      * <p>
      *             The Router ID of the router that originated the LSA.  For
@@ -134,7 +176,7 @@ class RLSA {
      *             the network's Designated Router.
      * </p>
      */
-    IPAddressString advertisingRouter;
+     final IPAddressString advertisingRouter;
     /**<p><h1>LSA LS sequence number</h1></p>
      * <p>
      *             The sequence number -N (0x80000000) is reserved (and
@@ -155,8 +197,8 @@ class RLSA {
      *             InitialSequenceNumber.
      * </p>
      */
-    int lsSeqNumber;
-    List<LinkData> links = new ArrayList<>();
+     final int lsSeqNumber;
+     List<LinkData> links = new ArrayList<>();
     //endregion OBJECT PROPERTIES
 
     //region OBJECT METHODS
@@ -195,11 +237,11 @@ class RLSA {
 
         if (!isChecksumCorrect(lsaBuffer))
             throw new ArithmeticException("The checksum in the provided buffer is invalid");
-        if (lsaBuffer.length != ((lsaBuffer[18] << 8) | lsaBuffer[19]))
+        if (lsaBuffer.length != (((lsaBuffer[18] << 8) & 0xff00) | (lsaBuffer[19] & 0xff)))
             throw new ArithmeticException("The buffer length does not match the header length ");
 
         //LS Age 0,1
-        int lsAge = (lsaBuffer[0] << 8) | lsaBuffer[1];
+        int lsAge = ((lsaBuffer[0] << 8) & 0xff00) | (lsaBuffer[1] & 0xff);
         this.lsAge = (short) lsAge;
 
         //LS ID 4,5,6,7
@@ -213,7 +255,8 @@ class RLSA {
         ).toAddressString();
 
         //LS Sequence No. 12,13,14,15
-        this.lsSeqNumber = ((lsaBuffer[12] << 24) | (lsaBuffer[13] << 16) | (lsaBuffer[14] << 8) | lsaBuffer[15]);
+        this.lsSeqNumber = (((lsaBuffer[12] << 24) & 0xff000000) | ((lsaBuffer[13] << 16) & 0xff0000) |
+                ((lsaBuffer[14] << 8) & 0xff00) | (lsaBuffer[15] & 0xff));
 
         /*All data before this point was in the 20 byte header. If there is no more data, as in the header was only
         being processed, then end here. If there is more than 20 bytes, then */
@@ -224,7 +267,7 @@ class RLSA {
 
         //Link State Information, byte 24 onwards. First check packet link state information sent is correct and was not
         //malformed by the other node.
-        int noLinks = (lsaBuffer[22] << 8) | lsaBuffer[23];
+        int noLinks = ((lsaBuffer[22] << 8) & 0xff00) | (lsaBuffer[23] & 0xff);
 
         int checkNoLinks = lsaBuffer.length;
         checkNoLinks -= 24;
@@ -253,7 +296,12 @@ class RLSA {
 
             this.links.add(newLinkData);
         }
+    }
 
+    @Override
+    public String toString() {
+        return this.lsID.toString() + ", " + this.advertisingRouter.toString() + ", " + this.lsSeqNumber + ", " +
+                this.lsAge;
     }
 
     /**<p><h1>Age This LSA</h1></p>
@@ -295,7 +343,7 @@ class RLSA {
      * full LSA with link data, all data will be added</p>
      * @return number of bytes the resulting buffer will contain
      */
-    int getLength() {
+     int getLength() {
         return LSA_HEADER_LENGTH + (links.size() * LINK_DATA_SIZE);
     }
 
@@ -305,7 +353,7 @@ class RLSA {
      * a completed length and checksum field, which should be overridden once the end buffer is complete.</p>
      * @return the router LSA header buffer
      */
-    public byte[] makeRLSAHeaderBuffer() {
+    byte[] makeRLSAHeaderBuffer() {
         byte[] buffer = {
                 0x00, 0x00,             //lsage //0,1
                             0x00,       //options //2
@@ -343,7 +391,7 @@ class RLSA {
         buffer[15] = lsSeqNumB[3];
 
         //Finally, update the length field and checksum field. Return the buffer containing the updated fields.
-        //Will be overriden anyway by makeRLSABuffer, and length will remain the same.
+        //Will be overridden anyway by makeRLSABuffer, and length will remain the same.
         return updateLSAHChecksumAndLength(buffer);
     }
 
@@ -352,7 +400,7 @@ class RLSA {
      * value has a completed LSA header checksum and length field.</p>
      * @return a full router LSA buffer
      */
-    public byte[] makeRLSABuffer() {
+    byte[] makeRLSABuffer() {
         byte[] buffer = {
                 0x00, 0x00,             //0, v, b, e, 0 (ignore flags) //20,21
                             0x00, 0x00, //number of links //22,23
@@ -395,12 +443,8 @@ class RLSA {
         buffer[18] = pLength[0];
         buffer[19] = pLength[1];
 
-        //checksum
-        //create buffer that doesn't contain the ls age field and checksum. Use that to calculate a checksum.
-        //Take returned int, update the value in the buffer.
-        byte[] checksumBuffer =  buffer;
-        checksumBuffer[0] = checksumBuffer[1] = checksumBuffer[16] = checksumBuffer[17] = 0x00;//checksum is buffer without age.
-        byte[] checksum = Ints.toByteArray(fletcherChecksum16(checksumBuffer));
+        //Calc checksum. Take returned int, update the value in the buffer.
+        byte[] checksum = Ints.toByteArray(fletcherChecksum16(buffer));
         buffer[16] = checksum[2];
         buffer[17] = checksum[3];
 

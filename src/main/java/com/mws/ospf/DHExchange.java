@@ -18,7 +18,7 @@ import java.util.Arrays;
  * <p>The current iteration of the class is intended only for use with p2p links, not multi-access. A flag, flagComplete,
  * is present to identify when the p2p exchange is complete.</p>
  */
-public class DHExchange {
+class DHExchange {
     //region OBJECT PROPERTIES
     private final RouterInterface rIntOwner;
     private final int keySize = 2048;

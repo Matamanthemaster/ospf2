@@ -9,7 +9,7 @@ import java.util.List;
  * <p>Base class for NeighbourNode and ThisNode. stores the common variables between both extend classes. Basic node
  * constraints are defined in this class.</p>
  */
-public abstract class Node {
+abstract class Node {
     //region OBJECT PROPERTIES
     private IPAddressString rid; //Router ID, a 32-bit integer represented in dotted decimal, identically to an IPv4 address.
     List<IPAddressString> knownNeighbours = new ArrayList<>();
@@ -60,7 +60,7 @@ public abstract class Node {
     }
 
     /**<p><h1>Get RID as int</h1></p>
-     * <p>Converts the RID IPAddressString to a binary string, which is parsed to an integer, with perserved MSB and LSB.
+     * <p>Converts the RID IPAddressString to a binary string, which is parsed to an integer, with preserved MSB and LSB.
      * The bigger the RID, the bigger the number. The method is useful for comparing which RID is bigger.</p>
      * @return an integer representing the RID, from a binary string
      * @throws NumberFormatException if the node rid is not a number.
@@ -78,13 +78,13 @@ public abstract class Node {
         if (knownNeighbours.size() == 0)
             return "";
 
-        String neighbours = "";
+        StringBuilder neighbours = new StringBuilder();
         for (IPAddressString neighbour: knownNeighbours)
         {
-            neighbours += neighbour.toString() + ",";
+            neighbours.append(neighbour.toString()).append(",");
         }
-        neighbours = neighbours.substring(0, neighbours.length()-1);
-        return neighbours;
+        neighbours = new StringBuilder(neighbours.substring(0, neighbours.length() - 1));
+        return neighbours.toString();
     }
 
     /**<p><h1>Get RID as Bytes</h1></p>

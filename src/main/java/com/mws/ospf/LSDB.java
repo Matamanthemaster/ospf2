@@ -7,18 +7,19 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
+/**<p><h1>LSDB</h1></p>
+ * <p>The Link-State Database. Stores all data for the node, derived from itself and from </p>
+ */
 class LSDB {
-
     //region OBJECT PROPERTIES
     /**<p><h1>Router LSA List</h1></p>
      *<p>Stores a list of router LSAs known to this node. The first item (index 0) will always be the local LSA data</p>
      */
-    List<RLSA> routerLSAs = new ArrayList<>();
-    Timer ageTimer = new Timer("LSDB-Age-Timer");
+     List<RLSA> routerLSAs = new ArrayList<>();
+    private final Timer ageTimer = new Timer("LSDB-Age-Timer");
     //endregion OBJECT PROPERTIES
 
     //region OBJECT METHODS
-
     /**<p><h1>Construct Link-State DataBase</h1></p>
      * <p>Construct a LSDB object. Sets up the first local LSA, and sets up the aging timer.</p>
      */
@@ -36,7 +37,11 @@ class LSDB {
         },1000,1000);
     }
 
-    void setupLocalRLSA() {
+    /**<p><h1>Setup the Local LSA</h1></p>
+     * <p>Set up the LSA that represents this node's data. Method will create an LSA if it was not already existing, or
+     * remake it and replace it if it now contains new data.</p>
+     */
+     void setupLocalRLSA() {
         //Set sequence number. For first time local R-LSA, this is the initial sequence number. If the local R-LSA already
         //exists, use that incremented. Also remove the old localRLSA, which is about to be overridden.
         int lsSeqNumber = RLSA.INITIAL_SEQUENCE_NUMBER;
@@ -68,7 +73,11 @@ class LSDB {
         routerLSAs.add(0, new RLSA(lsSeqNumber, linkData));
     }
 
-    void removeRLSA(RLSA lsa) {
+    /**<p><h1>Remove LSA</h1></p>
+     * <p>Removes an LSA from the LSA list, typically when the LSA ages itself to max age and wants to remove itself.</p>
+     * @param lsa the specific LSA to remove
+     */
+     void removeRLSA(RLSA lsa) {
         routerLSAs.remove(lsa);
         if (lsa.advertisingRouter.equals(Config.thisNode.getRID())) {
             setupLocalRLSA();
@@ -76,5 +85,3 @@ class LSDB {
     }
     //endregion OBJECT METHODS
 }
-
-

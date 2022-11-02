@@ -4,7 +4,7 @@ package com.mws.ospf;
 /**<p><h1>Interface Types</h1></p>
  * <p>An enumerable list of common interface types. Can be used to derive interface information</p>
  */
-public enum InterfaceType {
+enum InterfaceType {
     /**<p><h1>T1</h1></p>
      * <p>A T1 serial interface operating at 1.544Mbps.</p>
      * <p><b>BW: 1.544Mbps</b></p>

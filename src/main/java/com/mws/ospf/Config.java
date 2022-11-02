@@ -31,7 +31,7 @@ import java.util.List;
 /**<p><h1>Application Configuration</h1></p>
 * <p>Class to store the OSPF config file reference, and values in java data types.</p>
 */
-public class Config {
+class Config {
     //region STATIC PROPERTIES
     private static File fileConfig = null; //File reference, for IO Operations
     static boolean flagFileConfRemove;
@@ -78,6 +78,9 @@ public class Config {
      * such as interface name and assigned IP addresses. Calls static void WriteConfig() to save sensible defaults to
      * a config file with path specified to CommonMain</p>
      * <p>>Uses file path in static File property 'Config.fileConfig'.</p>
+     * @throws SocketException if there are no interfaces on the computer, or an IOException occurs
+     * @throws AddressStringException an interface address from getNetworkInterface was invalid format for IPAddressString
+     * @throws UnknownHostException could not determine a host address
      */
     private static void makeConfig() throws SocketException, UnknownHostException, AddressStringException {
 

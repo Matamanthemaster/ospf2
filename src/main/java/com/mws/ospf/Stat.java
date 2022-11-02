@@ -12,12 +12,11 @@ import java.util.*;
  * <p>Class to store, collect and process statistic information for research. Sets up a timer in the SetupStats method to
  * perform the collection activities at a set interval. At the </p>
  */
-public class Stat {
+class Stat {
     //region STATIC PROPERTIES
     static File fileStats =  new File(System.getProperty("user.dir") + System.getProperty("file.separator") + "ospf.stat.csv");
     static int endNoAdjacencies = -1;
     private static long tsStart;
-    private static long tsConvergence;
     private static final LinkedHashSet<Long> timeOrderedSet = new LinkedHashSet<>();
     private static final HashMap<Long, Long> cpuTime = new HashMap<>();
     private static final HashMap<Long, Long> memUsage = new HashMap<>();
@@ -52,7 +51,7 @@ public class Stat {
      */
     static void endStats() {
         //get endpoint of statistics
-        tsConvergence = System.currentTimeMillis();
+        long tsConvergence = System.currentTimeMillis();
         recordStat(tsConvergence);
 
         //Stop new statistics being recorded

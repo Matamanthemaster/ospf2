@@ -7,8 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static com.mws.ospf.RLSA.LSA_HEADER_LENGTH;
+import java.util.Objects;
 /*      Stripped DBD packet
          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
          |         Interface MTU         |    Options    |0|0|0|0|0|I|M|MS
@@ -27,8 +26,11 @@ import static com.mws.ospf.RLSA.LSA_HEADER_LENGTH;
          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  */
 
-/**
- *
+/**<p><h1>DBD Packet</h1></p>
+ * <p>A database description packet. This could be a DBD packet just received, a DBD packet to be sent, or a DBD packet
+ * ready to retransmit. Contains interface MTU, flags bits, a dd sequence number and a list of LSAs contained within.</p>
+ * <p>Contains separate constructors for a locally originated DBD or received DBD. Contains the precalculated buffer
+ * derived from the stored data, including LSAs.</p>
  */
 class DBDPacket {
     //region STATIC CONSTANTS
@@ -36,11 +38,11 @@ class DBDPacket {
     //endregion STATIC CONSTANTS
 
     //region OBJECT PROPERTIES
-    public int ddSeqNo;
-    public byte dbdFlags;
-    public List<RLSA> listLSAs = new ArrayList<>();
-    private int mtu;
-    final byte[] packetBuffer;
+    private int ddSeqNo;
+    public final byte dbdFlags;
+    public final List<RLSA> listLSAs;
+    private final int mtu;
+    byte[] packetBuffer;
     //endregion OBJECT PROPERTIES
 
     //region OBJECT METHODS
@@ -55,8 +57,7 @@ class DBDPacket {
     public DBDPacket(int mtu, int ddSeqNo, byte dbdFlags, @Nullable List<RLSA> listLSAs) {
         this.ddSeqNo = ddSeqNo;
         this.dbdFlags = dbdFlags;
-        if (listLSAs != null)
-            this.listLSAs = listLSAs;
+        this.listLSAs = Objects.requireNonNullElseGet(listLSAs, ArrayList::new);
         this.mtu = mtu;
 
         this.packetBuffer = makeDBDPacket();
@@ -73,22 +74,26 @@ class DBDPacket {
         this.packetBuffer = packetBuffer;
         byte[] strippedPacketBuffer = Arrays.copyOfRange(packetBuffer, StdDaemon.HEADER_LENGTH, packetBuffer.length);
 
-        this.mtu = (strippedPacketBuffer[0] << 8) | strippedPacketBuffer[1];
-        this.dbdFlags = strippedPacketBuffer[3];
-        this.ddSeqNo = (strippedPacketBuffer[4] << 24) | (strippedPacketBuffer[5] << 16) |
-                (strippedPacketBuffer[6] << 8) | strippedPacketBuffer[7];
+        this.listLSAs = new ArrayList<>();
 
-        //Create LSA for each LSA in the DBD packet. Use LSAs for length.
-        //" The rest of the packet consists of a (possibly partial) list of the
+        this.mtu = ((strippedPacketBuffer[0] << 8) & 0xff00) | strippedPacketBuffer[1];
+        this.dbdFlags = strippedPacketBuffer[3];
+        this.ddSeqNo = (((strippedPacketBuffer[4] << 24) & 0xff000000) | ((strippedPacketBuffer[5] << 16) & 0xff0000) |
+                ((strippedPacketBuffer[6] << 8) & 0xff00) | strippedPacketBuffer[7] & 0xff);
+
+        /*" The rest of the packet consists of a (possibly partial) list of the
         //  link-state database's pieces.  Each LSA in the database is described
         //  by its LSA header."
-        //The loop self-validates, and while is important.
+
+        new RLSA self-validates. First scrape the size from bytes 18 and 19 from the potential LSA, use this to copy
+        all data from the buffer to a new RLSA. Increment offset. Acts like a for loop, but with varying index value*/
         int offset = DBD_HEADER_LENGTH;
         try {
             while (offset < strippedPacketBuffer.length) {
-                byte[] lsaBuffer = Arrays.copyOfRange(strippedPacketBuffer, offset, offset + LSA_HEADER_LENGTH);
-                listLSAs.add(new RLSA(lsaBuffer));
-                offset += (lsaBuffer[18] << 8) | lsaBuffer[19];
+                int reportedLSASize = ((strippedPacketBuffer[offset + 18] << 8) & 0xff00) |
+                        (strippedPacketBuffer[offset + 19] & 0xff);
+                listLSAs.add(new RLSA(Arrays.copyOfRange(strippedPacketBuffer, offset, offset + reportedLSASize)));
+                offset += reportedLSASize;
             }
         } catch (ArithmeticException ex) {
             Launcher.printToUser("An R-LSA from a received DBD packet was malformed at offset " + offset + ": " +
@@ -106,6 +111,24 @@ class DBDPacket {
             ex.printStackTrace();
             Launcher.printBuffer(strippedPacketBuffer);
         }
+    }
+
+    /**<p><h1>ddSeqNo Setter</h1></p>
+     * <p>Sets/Updates the value of ddSeqNo in the DBD packet. Also updates packetBuffer with new values. This is mainly
+     * useful for ensuring lastSentBuffer for slave is updated correctly.</p>
+     * @param newDDSeqNo sequence number to update to
+     */
+    void setDDSeqNo(int newDDSeqNo) {
+        this.ddSeqNo = newDDSeqNo;
+        this.packetBuffer = makeDBDPacket();
+    }
+
+    /**<p><h1>ddSeqNo Getter</h1></p>
+     * <p>Returns the value of ddSeqNo, without exposing blind setting</p>
+     * @return ddSeqNo
+     */
+    public int getDDSeqNo() {
+        return this.ddSeqNo;
     }
 
     /**<p><h1>Is MS Bit Set</h1></p>
@@ -147,16 +170,9 @@ class DBDPacket {
      * @return a fully complete DBD packet byte buffer
      */
     private byte[] makeDBDPacket() {
-        byte[] buffer;
-
         //GENERIC OSPF HEADER
-        if (Launcher.operationMode.equals("encrypted"))
-            buffer = new byte[] {0x04};
-        else
-            buffer = new byte[] {0x02};
-
-        buffer = Bytes.concat(
-                buffer,
+        byte[] buffer = Bytes.concat(
+                new byte[] {Launcher.operationMode},
                 new byte[] {
                         //Assume 0x02 or 0x04 is here
                               0x02,//message type
@@ -176,10 +192,9 @@ class DBDPacket {
                 new byte[] {mtuBuffer[2], mtuBuffer[3], 0x00, dbdFlags},//20,21,22,23
                 Ints.toByteArray(ddSeqNo)
         );
-
         //Add in LSA data. Only copy in the header for DBDs.
         for (RLSA lsa: listLSAs) {
-            Bytes.concat(buffer, lsa.makeRLSABuffer());
+            buffer = Bytes.concat(buffer, lsa.makeRLSABuffer());
         }
 
         return StdDaemon.updateChecksumAndLength(buffer);

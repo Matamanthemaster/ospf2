@@ -4,7 +4,7 @@ package com.mws.ospf;
  * <p>The state of a neighbour node. Based on OSPF states, used in protocol process flow. Each state has an associated
  * value</p>
  */
-public enum ExternalStates {
+enum ExternalStates {
     DOWN(0),
     INIT(1),
     TWOWAY(2),

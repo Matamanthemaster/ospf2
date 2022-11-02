@@ -75,7 +75,7 @@ class LinkData {
      * @return the link metric of the object
      */
     public int getMetric() {
-        return (this.metric[0] << 8) | this.metric[1];
+        return (this.metric[0] << 8 & 0xff00) | (this.metric[1] & 0xff);
     }
 
     /**<p><h1>Make Link Data Buffer</h1></p>
@@ -94,10 +94,8 @@ class LinkData {
                 new byte[] {
                         0x00,//number of TOS //9
                 },
-                this.metric, //10,11
-                new byte[] {
-                        //TOS ID, literal 0, TOS Metric, (PER TOS ENTRY)
-                }
+                this.metric //10,11
+                //TOS ID, ignore, TOS Metric, (PER TOS ENTRY)
         );
     }
     //endregion OBJECT METHODS

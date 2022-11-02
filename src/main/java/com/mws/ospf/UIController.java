@@ -19,7 +19,7 @@ import javafx.util.Duration;
 /**<p><h1>JavaFX GUI Scene Controller</h1></p>
  * <p>Controller class for the GUI application in the artefact. Allows manipulation of the JavaFX application
  * programmatically by firing events specified in the FXML document. On event firings, specified methods are called,
- * able to manipulate other elements of the GUI application.</p>
+ * able to manipulate other elements of the GUI application. Must be public for FXML reference.</p>
  */
 public class UIController {
     //region OBJECT PROPERTIES

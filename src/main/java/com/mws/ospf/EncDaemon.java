@@ -21,7 +21,7 @@ import static com.mws.ospf.StdDaemon.*;
  * application process flow is controlled by this class. It uses several methods and properties from the StdDaemon,
  * while providing opposite functionality.</p>
  */
-public class EncDaemon {
+class EncDaemon {
     //region STATIC PROPERTIES
     static final Thread threadEncMulticastListen = new Thread(EncDaemon::receiveMulticastThread,
             "Thread-DHHello-Receive");
@@ -195,12 +195,14 @@ public class EncDaemon {
 
 
             switch (packetBuffer[1]) {
-                //Hello packet
                 case 0x01 -> {
                     if (neighbour != null)
                         processHelloPacket(neighbour, neighbourRID, packetBuffer);
                 }
-                //DH PubKey packet
+                case 0x02 -> {
+                    assert neighbour != null;
+                    StdDaemon.processDBDPacket(neighbour, packetBuffer);
+                }
                 case 0x06 -> processDHPubKeyPacket(neighbour, neighbourRID, pSource, packetBuffer);
             }
         }
@@ -264,7 +266,7 @@ public class EncDaemon {
         /*If in init state and this neighbour reports to know of this current node, this is the conditions for the
         2WayReceived event. Trigger it*/
         if (neighbour.getState() == ExternalStates.INIT && neighbour.knownNeighbours.contains(Config.thisNode.getRID()))
-            twoWayReceivedEvent(neighbour);
+            StdDaemon.evTwoWayReceived(neighbour);
     }
 
     /**<p><h1>Process Diffie-Hellman PubKey Packet</h1></p>
@@ -295,13 +297,11 @@ public class EncDaemon {
             /*This is a new packet from an unknown neighbour node. send a DH packet immediately with this
             node's public key, so it can guarantee to generate the secret key this cycle.
             Nodes are likely to send and receive two copies. For normal hello that's ok, because the second packet
-            contains the neighbour in the sent neighbours list
+            contains the neighbour in the sent neighbours list.
 
-            For experiment purposes, the wait function makes it likely only one packet is needed, so if wait is being
-            used, don't send guarantee sync with extra packets*/
-            if (!(Launcher.flagWait || Launcher.flagStart)) {
-                sendDHPubKey();
-            }
+            From testing, the only way to avoid waiting is to force send packets. This would affect processing
+            statistics, but it is mandated to avoid waiting for hello timers to expire.*/
+            sendDHPubKey();
         }
 
         Launcher.printToUser("New DH solicitation for reported node '" + neighbour.getRID() + "'");
@@ -313,32 +313,6 @@ public class EncDaemon {
         //Not in OSPF spec to send an extra packet on receiving one from a down neighbour.
         if (neighbour.getState() == ExternalStates.DOWN)
             EncDaemon.sendHelloPackets();
-    }
-
-    /**<p><h1>Encrypted 2WayReceived Event</h1></p>
-     * <p>On neighbour state Init, if a node receives a hello packet with its own RID echoed, the event 2WayReceived is
-     * fired. This method is the trigger for the exchange protocol to start for the neighbour node.</p>
-     * <p>The standard and the encrypted 2WayReceived events must be different due to the encryption steps.</p>
-     * @param neighbourNode node that has had the 2WayReceived event trigger
-     */
-    private static void twoWayReceivedEvent(NeighbourNode neighbourNode) {
-        //Quick sanity check TwoWayReceived did occur
-        if (neighbourNode.getState() != ExternalStates.INIT)
-            return;
-
-        //Set Correct state for event
-        neighbourNode.setState(ExternalStates.EXSTART);
-
-        //Prevent the DHExchange from sending DHPubKey packets on the rint (ASSUMES INTERFACE IS P2P)
-        neighbourNode.rIntOwner.dhExchange.flagComplete = true;
-
-        //Refresh the local LSA, which will add the new neighbour
-        Config.lsdb.setupLocalRLSA();
-
-        //Current future method
-        //Statistics Endpoint test
-        if ((Config.thisNode.knownNeighbours.size() >= Stat.endNoAdjacencies) && Stat.endNoAdjacencies != -1)
-            Stat.endStats();
     }
 
     /**<p><h1>Make Hello Packet</h1></p>
@@ -362,9 +336,7 @@ public class EncDaemon {
                 0x00, 0x00,//checksum
                 0x00, 0x00,//Auth type//0x00, 0x01
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,//Auth Data//0x63, 0x69, 0x73, 0x63, 0x6f, 0x00, 0x00, 0x00//"Cisco"
-        };
 
-        byte[] dataBuffer = {
                 //OSPF HELLO PACKET HEADER
                 (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,//Network Mask, p2p networks equal to 0.0.0.0.
                 0x00, 0x0a,//hello interval//10
@@ -395,15 +367,11 @@ public class EncDaemon {
             if (n.getState() == ExternalStates.DOWN)
                 continue;
 
-            dataBuffer = Bytes.concat(dataBuffer, n.getRIDBytes());
+            ospfBuffer = Bytes.concat(ospfBuffer, n.getRIDBytes());
         }
 
-        //Encrypt the buffer of known neighbours and append it to the data portion of the packet.
-        dataBuffer = neighbour.enParam.encrypt(dataBuffer);
-        ospfBuffer = Bytes.concat(ospfBuffer, dataBuffer);
-
-        //Update packet length (2, 3), Update Checksum (12, 13)
-        return updateChecksumAndLength(ospfBuffer);
+        //Update packet length (2, 3), Update Checksum (12, 13). Encrypt data portion
+        return updateChecksumAndLength(neighbour.enParam.encrypt(ospfBuffer));
     }
 
     /**<p><h1>Try to Decrypt Packet Buffer</h1></p>
