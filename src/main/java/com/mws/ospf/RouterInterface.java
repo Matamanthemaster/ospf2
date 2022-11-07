@@ -56,11 +56,11 @@ class RouterInterface {
 
     //region OBJECT PROPERTIES
     private final String name;
-    public IPAddress addrIPv4;
-    public List<IPAddress> addrIPv6;//List of addresses assigned to a router interface.
-    public InterfaceType type; //Interface type identifier. Used by code to determine what type of interface it is. Uses enum
-    public Boolean isEnabled; //Interface on?
-    public long bandwidth; //BW used by default OSPF calculation, derived from interface type in constructor.
+    IPAddress addrIPv4;
+    List<IPAddress> addrIPv6;//List of addresses assigned to a router interface.
+    InterfaceType type; //Interface type identifier. Used by code to determine what type of interface it is. Uses enum
+    Boolean isEnabled; //Interface on?
+    long bandwidth; //BW used by default OSPF calculation, derived from interface type in constructor.
     int cost = -1;
     DHExchange dhExchange;
     //endregion
@@ -96,7 +96,7 @@ class RouterInterface {
      * <p>Getter for the RouterInterface name property</p>
      * @return interface name
      */
-    public String getName() {
+    String getName() {
         return name;
     }
 
@@ -107,7 +107,7 @@ class RouterInterface {
      * between 0 and 1), treat the cost as 1.</p>
      * @return interface cost calculated
      */
-    public int getCost() {
+    int getCost() {
         //Use static cost if defined.
         if (cost != -1)
             return cost;
@@ -129,7 +129,7 @@ class RouterInterface {
      * @return NetworkInterface object for the interface.
      * @throws SocketException if an I/O error occurs
      */
-    public NetworkInterface toNetworkInterface() throws SocketException {
+    NetworkInterface toNetworkInterface() throws SocketException {
         return NetworkInterface.getByName(this.name);
     }
 
@@ -139,7 +139,7 @@ class RouterInterface {
      * @param ip ip to check against the current interface's addrIPv4
      * @return true if the network addresses match
      */
-    public boolean isAddressInNetwork(IPAddress ip) {
+    private boolean isAddressInNetwork(IPAddress ip) {
         ip = ip.setPrefixLength(addrIPv4.getNetworkPrefixLength());
         return addrIPv4.toZeroHost().equals(ip.toZeroHost());
     }

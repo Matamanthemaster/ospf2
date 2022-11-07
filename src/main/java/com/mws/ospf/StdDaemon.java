@@ -22,11 +22,11 @@ import static com.mws.ospf.Launcher.operationMode;
 class StdDaemon {
     //region STATIC PROPERTIES
     static final int MTU = 1300;
+    static final int HEADER_LENGTH = 24;
     static MulticastSocket multicastSocket;
     static InetSocketAddress multicastSocketAddr;
     static Timer timerHelloSend;
     private static final Thread threadStdMulticastListen = new Thread(StdDaemon::receiveMulticastThread, "Thread-Hello-Receive");
-    static final int HEADER_LENGTH = 24;
     //endregion
 
     //region STATIC METHODS

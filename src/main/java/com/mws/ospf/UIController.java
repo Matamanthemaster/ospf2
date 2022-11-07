@@ -87,9 +87,26 @@ public class UIController {
             ((Label) vbTabPropValues.getChildren().get(1)).setText(n.ipAddress.toPrefixLengthString());
             ((Label) vbTabPropValues.getChildren().get(2)).setText(n.getState().toString());
             ((Label) vbTabPropValues.getChildren().get(3)).setText(n.getKnownNeighboursString());
-        }
 
+            //Start of DBD data display
+            HBox hbDBDRoot = (HBox) vbTabPropValues.getChildren().get(5);
+            hbDBDRoot.getChildren().clear();
 
+            //For each learned RLSA, create a string as header. Also append link data as children underneath.
+            for (RLSA lsa: n.lsaRequestList) {
+                hbDBDRoot.getChildren().add(new Label(lsa.toString()));
+                //Make a string containing the link buffer as hex. Loop over each byte, convert into hex split into bytes
+                for (LinkData link: lsa.links) {
+                    StringBuilder linkBufferString = new StringBuilder("    ");
+                    for (byte b: link.makeBuffer())
+                    {
+                        linkBufferString.append(String.format("%02X", b)).append(" ");
+                    }// for (byte b: link.makeBuffer())
+
+                    hbDBDRoot.getChildren().add(new Label(linkBufferString.toString()));
+                }// for (LinkData link: lsa.links) {
+            }// for (RLSA lsa: n.lsaRequestList) {
+        } // for (NeighbourNode n : Config.neighboursTable) {
     }
 
     /**<p><h1>Add Neighbour to GUI</h1></p>
@@ -104,6 +121,7 @@ public class UIController {
         hbTabRoot.getChildren().add(0, vbTabPropNames);
         hbTabRoot.getChildren().add(1, vbTabPropValues);
 
+        //Neighbour information
         vbTabPropNames.getChildren().add(0, new Label("RID: "));
         vbTabPropValues.getChildren().add(0, new Label(n.getRID().toString()));
 
@@ -115,6 +133,11 @@ public class UIController {
 
         vbTabPropNames.getChildren().add(3, new Label("Known Neighbours: "));
         vbTabPropValues.getChildren().add(3, new Label(n.getKnownNeighboursString()));
+
+        //DBD Data
+        HBox hbDBDRoot = new HBox();
+        vbTabPropNames.getChildren().add(4, new Label("LSA Request List:"));
+        vbTabPropNames.getChildren().add(5, hbDBDRoot);
 
         n.tab = new Tab();
         n.tab.setText(n.getRID().toString());

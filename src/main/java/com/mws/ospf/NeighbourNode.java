@@ -30,15 +30,6 @@ class NeighbourNode extends Node {
         }
         return null;
     }
-
-    /**<p><h1>Does Neighbour Node Exist</h1></p>
-     * <p>Method checks if neighbour node exists in the neighbours table list.</p>
-     * @param rid Router ID to check
-     * @return true if it exists, false if not
-     */
-    public static boolean isNeighbourNodeExists(IPAddressString rid) {
-        return getNeighbourNodeByRID(rid) != null;
-    }
     //endregion
 
     //region OBJECT PROPERTIES
@@ -126,7 +117,7 @@ class NeighbourNode extends Node {
      * <p>Getter for neighbour node state</p>
      * @return the ExternalState of the node
      */
-    public ExternalStates getState() {
+    ExternalStates getState() {
         return this.state;
     }
 
@@ -180,7 +171,7 @@ class NeighbourNode extends Node {
      * will attempt to retransmit the last packet which has not been acknowledged.</p><p></p>
      * <p>At this stage, only the DBD packets are retransmitted.</p>
      */
-    void expireRxmtTimer() {
+    private void expireRxmtTimer() {
         switch (this.getState()) {
             case EXSTART -> {
                     /*In ExStart, master has not been negotiated. Retransmit negotiation packet if it still exists as

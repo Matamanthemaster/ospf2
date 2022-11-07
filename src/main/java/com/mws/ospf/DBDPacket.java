@@ -39,10 +39,10 @@ class DBDPacket {
 
     //region OBJECT PROPERTIES
     private int ddSeqNo;
-    public final byte dbdFlags;
-    public final List<RLSA> listLSAs;
+    private final byte dbdFlags;
+    final List<RLSA> listLSAs;
     private final int mtu;
-    byte[] packetBuffer;
+     byte[] packetBuffer;
     //endregion OBJECT PROPERTIES
 
     //region OBJECT METHODS
@@ -127,7 +127,7 @@ class DBDPacket {
      * <p>Returns the value of ddSeqNo, without exposing blind setting</p>
      * @return ddSeqNo
      */
-    public int getDDSeqNo() {
+    int getDDSeqNo() {
         return this.ddSeqNo;
     }
 
@@ -135,7 +135,7 @@ class DBDPacket {
      * <p>Is the master bit in this DBD packet set? This flag determines the sending node is declaring itself master.</p>
      * @return true if MS is set
      */
-    public boolean isMSBitSet() {
+    boolean isMSBitSet() {
         return (dbdFlags & 0x01) > 0;
     }
 
@@ -143,7 +143,7 @@ class DBDPacket {
      * <p>Is the more bit in this DBD packet set? This flag determines if the sending node has more data to send.</p>
      * @return true if M is set
      */
-    public boolean isMoreBitSet() {
+    boolean isMoreBitSet() {
         return (dbdFlags & 0x02) > 0;
     }
 
@@ -151,7 +151,7 @@ class DBDPacket {
      * <p>Is the init bit in this DBD packet set? This flag determines the sender is initiating an exchange.</p>
      * @return true if I is set
      */
-    public boolean isInitBitSet() {
+    boolean isInitBitSet() {
         return (dbdFlags & 0x04) > 0;
     }
 
@@ -159,7 +159,7 @@ class DBDPacket {
      * <p>The first DBD packet has MS, M and I set. Determine if all 3 bits are set.</p>
      * @return true if MS, M and I are set
      */
-    public boolean isFirstPacket() {
+    boolean isFirstPacket() {
         return isMSBitSet() && isMoreBitSet() && isInitBitSet();
     }
 

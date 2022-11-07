@@ -8,7 +8,7 @@
       <Label id="lblOutStatus" fx:id="lblOutStatus" layoutX="14.0" layoutY="14.0" styleClass="lblOutStatus" />
       <Label id="lblDispRID" fx:id="lblDispRID" layoutX="21.0" layoutY="33.0" text="Router ID" />
       <TextField id="txtRID" fx:id="txtRID" layoutX="14.0" layoutY="51.0" onKeyPressed="#txtRIDKeyPressed" />
-      <TabPane id="tbpNeighbours" fx:id="tbpNeighbours" layoutY="186.0" prefHeight="144.0" prefWidth="600.0" styleClass="tbpNeighbours" tabClosingPolicy="UNAVAILABLE" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0">
+      <TabPane id="tbpNeighbours" fx:id="tbpNeighbours" layoutY="186.0" prefHeight="319.0" prefWidth="600.0" styleClass="tbpNeighbours" tabClosingPolicy="UNAVAILABLE" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0">
         <tabs>
           <Tab text="Untitled Tab 1">
             <content>
