@@ -12,6 +12,7 @@ class ThisNode extends Node {
     //region OBJECT PROPERTIES
     List<RouterInterface> interfaceList;
     String hostname;
+    int neighboursDone;
     //endregion
 
     //region OBJECT METHODS

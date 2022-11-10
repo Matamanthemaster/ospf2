@@ -486,17 +486,20 @@ class StdDaemon {
         //Set Correct state for event
         neighbour.setState(ExternalStates.LOADING);
 
-        //Current future method
-        //Statistics Endpoint test
-        if ((Config.thisNode.knownNeighbours.size() >= Stat.endNoAdjacencies) && Stat.endNoAdjacencies != -1)
+        //Statistics Endpoint test. If stats not finished, don't display anything and continue. ElIf stats done, end.
+        Config.thisNode.neighboursDone++;
+        if (Stat.endNoAdjacencies != -1 && (Config.thisNode.neighboursDone < Stat.endNoAdjacencies))
+            return;
+        else if (Stat.endNoAdjacencies != -1)
             Stat.endStats();
 
-
-        //Display data received from each neighbour.
+        //Display data received from each neighbour. Only reached if stats not enabled, or stats complete.
         //1) Header, 2) Neighbour number, 3) LSA headers 4) LSA data (encoded form)
         Launcher.printToUser("Data In Request Lists:");
         for (NeighbourNode n: Config.neighboursTable) {
-            System.out.println(neighbour.lsaRequestList.size() + " Records:\n\r" +
+            if (n.getState().value < ExternalStates.LOADING.value)
+                continue;
+            System.out.println(neighbour.lsaRequestList.size() + " Records from " + n.getRID().toString() + ":\n\r" +
                     "lsID, Adv. Router, Seq#, age");
             for (RLSA lsa: n.lsaRequestList) {
                 System.out.println(lsa.toString());

@@ -143,6 +143,8 @@ class NeighbourNode extends Node {
             timerInactivity.cancel();
         } catch (IllegalStateException ignored) {}//IllegalStateException: Timer already cancelled.
 
+        if (this.state.value >= ExternalStates.LOADING.value)
+            Config.thisNode.neighboursDone--;
         this.knownNeighbours.clear();
         this.setState(ExternalStates.DOWN);
         this.enParam = null;
