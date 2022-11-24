@@ -1,6 +1,7 @@
 package com.mws.ospf;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +21,7 @@ class Launcher {
                     "   --help                              Prints this help message" + System.lineSeparator() +
                     "   -g, --with-gui                      Runs the program with the GUI frontend" + System.lineSeparator() +
                     "   -c, --config-file </Path/To/File>   Specify an alternate config file (Default ./ospf.conf.xml)" + System.lineSeparator() +
+                    "   -l, --log-file </Path/To/File>      Specify a log file to write program messages to " + System.lineSeparator() +
                     "   -W, --wait                          Tell the application to wait for a start signal from an adjacent node" + System.lineSeparator() +
                     "   -S, --start-exp                     Tell the application to send a start signal to all connected nodes" + System.lineSeparator() +
                     "   -s, --stats-file </Path/To/File>    Specify an alternative statistic file path (Default ./ospf.stats.csv)" + System.lineSeparator() +
@@ -32,6 +34,8 @@ class Launcher {
     static byte operationMode;
     static boolean flagWait;
     static boolean flagStart;
+    private static File logFile;
+    private static FileWriter logFileWriter;
     //endregion
 
     //region STATIC METHODS
@@ -165,6 +169,19 @@ class Launcher {
                     }
                     i++;
                 }
+                case "-l", "--log-file" -> {
+                    try {
+                        logFile = new File(args[i+1]);
+                        logFile.delete();
+                        logFile.createNewFile();
+                        logFileWriter = new FileWriter(logFile);
+                    } catch (ArrayIndexOutOfBoundsException ex) {
+                        handleLauncherError("Path for the --log-file flag was missing");
+                    } catch (IOException e) {
+                        handleLauncherError("IOException when creating a log file.");
+                    }
+                    i++;
+                }
                 case "-W", "--wait" -> flagWait = true;
                 case "-S", "--start-exp" -> flagStart = true;
                 case "-s", "--stats-file" -> {
@@ -231,9 +248,20 @@ class Launcher {
      * @param message message to be displayed
      */
     static void printToUser(String message) {
-        System.out.print("[OSPFv" + operationMode);
-        System.out.print("@" + Config.thisNode.hostname + "]: ");
-        System.out.println(message);
+        String line = "[OSPFv" + operationMode + "@" + Config.thisNode.hostname + "-" +
+                System.currentTimeMillis() + "]: " + message;
+        System.out.println(line);
+        if (logFile == null)
+            return;
+        if (!logFile.exists())
+            return;
+
+        try {
+            logFileWriter.write(line + System.lineSeparator());
+            logFileWriter.flush();
+        } catch (IOException ex) {
+            handleLauncherError("Could not write message to log file due to IOException: " + ex.getMessage());
+        }
     }
 
     /**<p><h1>Error Handle (Launcher)</h1></p>

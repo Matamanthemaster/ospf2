@@ -1,0 +1,16 @@
+In qemu/kvm, clone image from the base image.
+(Optional) Install GUI to cloned image
+Update /etc/hostname and /etc/hosts with NodeX.
+Add hardware NICs for each link.
+Reboot.
+Modify /etc/network/interfaces. For each interface, add:
+	rename intname=LinkX
+	auto LinkX
+	iface LinkX inet dhcp
+systemctl restart networking
+(Optional) refresh the jar file to the latest version.
+Run the jar file once, usign either startup scripts or manual through java -jar.
+Change the config file, updating RID and setting interfaces in experiment to enabled at a minimum.
+
+The VM is now set up, and to perform the experiment, modify the config file, and run the jar file with desired flags.
+Use java -jar ospf.jar --help for information on flags.
