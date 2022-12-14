@@ -1,0 +1,6 @@
+Install debian 11 from boot USB.
+Set up as desired. For this, a single partition for the system. Installing minimal softwear.  Set up a second user with root permissions.
+Modify password for second user to not require password. Make sure user has sudo permissions, and has the nopasswd attribute applied.
+Install the latest version of open JDK and open javafx.
+Set up a shared file filesystem in fstab, using 9p to pass through a directory on the host to the VM.
+copy the jar file to the VM.
